@@ -11,7 +11,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -25,7 +25,7 @@ import java.io.InputStreamReader
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-class TunnelPrototypeActivity : AppCompatActivity() {
+class TunnelPrototypeActivity : ComponentActivity() {
 
     private lateinit var logView: TextView
     private lateinit var scrollView: ScrollView
