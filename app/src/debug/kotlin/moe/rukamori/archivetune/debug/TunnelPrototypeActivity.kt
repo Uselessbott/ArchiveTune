@@ -252,7 +252,7 @@ class TunnelPrototypeActivity : ComponentActivity() {
                 if (ngrokProcess === process) ngrokProcess = null
             }
 
-            log("Process started with PID: ${process/* pid */ -1L}")
+            log("Process started.")
             lifecycleScope.launch(Dispatchers.IO) {
                 delay(3000)
                 discoverPublicUrl()
@@ -310,7 +310,7 @@ class TunnelPrototypeActivity : ComponentActivity() {
                 if (ngrokProcess === process) ngrokProcess = null
             }
 
-            log("Process started with PID: ${process/* pid */ -1L}")
+            log("Process started.")
             lifecycleScope.launch(Dispatchers.IO) {
                 delay(3000)
                 discoverPublicUrl()
@@ -499,7 +499,7 @@ class TunnelPrototypeActivity : ComponentActivity() {
         sb.appendLine("--- Process Info ---")
         val proc = ngrokProcess
         if (proc != null && proc.isAlive) {
-            sb.appendLine("PID: ${proc/* pid */ -1L}")
+            sb.appendLine("PID: "-"")
             sb.appendLine("isAlive: true")
         } else {
             sb.appendLine("Process: not running")
