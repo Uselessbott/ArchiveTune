@@ -252,7 +252,7 @@ class TunnelPrototypeActivity : ComponentActivity() {
                 if (ngrokProcess === process) ngrokProcess = null
             }
 
-            log("Process started with PID: ${process.pid()}")
+            log("Process started.")
             lifecycleScope.launch(Dispatchers.IO) {
                 delay(3000)
                 discoverPublicUrl()
@@ -310,7 +310,7 @@ class TunnelPrototypeActivity : ComponentActivity() {
                 if (ngrokProcess === process) ngrokProcess = null
             }
 
-            log("Process started with PID: ${process.pid()}")
+            log("Process started.")
             lifecycleScope.launch(Dispatchers.IO) {
                 delay(3000)
                 discoverPublicUrl()
@@ -438,7 +438,7 @@ class TunnelPrototypeActivity : ComponentActivity() {
     // ---- Helper: extract public URL ----
     private fun extractPublicUrl(json: String?): String? {
         if (json == null) return null
-        val regex = "\"public_url\"\s*:\s*\"(https?://[^\"]+)\"".toRegex()
+        val regex = Regex("""\"public_url\"\s*:\s*\"(https?://[^\"]+)\"""")
         return regex.find(json)?.groupValues?.get(1)
     }
 
@@ -499,7 +499,7 @@ class TunnelPrototypeActivity : ComponentActivity() {
         sb.appendLine("--- Process Info ---")
         val proc = ngrokProcess
         if (proc != null && proc.isAlive) {
-            sb.appendLine("PID: ${proc.pid()}")
+            sb.appendLine("PID: -")
             sb.appendLine("isAlive: true")
         } else {
             sb.appendLine("Process: not running")
