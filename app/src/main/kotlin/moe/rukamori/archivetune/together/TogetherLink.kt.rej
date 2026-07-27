@@ -1,0 +1,14 @@
+--- app/src/main/kotlin/moe/rukamori/archivetune/together/TogetherLink.kt
++++ app/src/main/kotlin/moe/rukamori/archivetune/together/TogetherLink.kt
+@@ -16,9 +16,10 @@
+ data class TogetherJoinInfo(
+     val host: String,
+     val port: Int,
+     val sessionId: String,
+     val sessionKey: String,
++    val wsUrl: String? = null,
+ ) {
+-    fun toWebSocketUrl(): String = "ws://$host:$port/together"
++    fun toWebSocketUrl(): String = wsUrl ?: "ws://$host:$port/together"
+ 
+     fun toDeepLink(): String {

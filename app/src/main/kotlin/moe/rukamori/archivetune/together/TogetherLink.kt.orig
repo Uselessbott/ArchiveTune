@@ -17,9 +17,8 @@ data class TogetherJoinInfo(
     val port: Int,
     val sessionId: String,
     val sessionKey: String,
-    val wsUrl: String? = null,
 ) {
-    fun toWebSocketUrl(): String = wsUrl ?: "ws://$host:$port/together"
+    fun toWebSocketUrl(): String = "ws://$host:$port/together"
 
     fun toDeepLink(): String {
         val charset = StandardCharsets.UTF_8.name()
@@ -85,12 +84,11 @@ object TogetherLink {
         val params = parseQuery(uri.rawQuery)
         val sid = params["sid"]?.trim().orEmpty()
         val key = params["key"]?.trim().orEmpty()
-        val fullUrl = uri.toString()
 
         if (host.isBlank() || sid.isBlank() || key.isBlank()) return null
         if (port !in 1..65535) return null
 
-        return TogetherJoinInfo(host = host, port = port, sessionId = sid, sessionKey = key, wsUrl = fullUrl)
+        return TogetherJoinInfo(host = host, port = port, sessionId = sid, sessionKey = key)
     }
 
     private fun decodeCompact(raw: String): TogetherJoinInfo? {
