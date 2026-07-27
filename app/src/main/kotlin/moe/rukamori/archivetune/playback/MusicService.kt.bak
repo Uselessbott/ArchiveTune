@@ -4499,6 +4499,126 @@ class MusicService :
         }
     }
 
+        ioScope.launch(SilentHandler) {
+            stopTogetherInternal()
+            togetherIsOnlineSession = false
+
+            // Discover tunnel URL from provider
+            val tunnelResult = tunnelProvider.discoverTunnelUrl()
+            when (tunnelResult) {
+                is TunnelResult.Success -> {
+                    val publicUrl = tunnelResult.publicUrl
+                    // Build WebSocket URL for Together
+                    val wsUrl = publicUrl.newBuilder()
+                        .scheme(if (publicUrl.isHttps) "wss" else "ws")
+                        .addEncodedPathSegment("together")
+                        .build()
+                        .toString()
+
+                    // Generate session details
+                    val sessionId = java.util.UUID.randomUUID().toString()
+                    val sessionKey = java.util.UUID.randomUUID().toString()
+
+                    // Use the same port as LAN (or could be configurable)
+                    val port = dataStore.get(TogetherDefaultPortKey, 42117)
+
+                    val server = createTogetherServer(
+                        port = port,
+                        displayName = displayName,
+                        settings = settings,
+                        sessionId = sessionId,
+                        sessionKey = sessionKey,
+                    )
+
+                    // Build join info with wsUrl
+                    val joinInfo = moe.rukamori.archivetune.together.TogetherJoinInfo(
+                        host = "tunnel",  // dummy, wsUrl overrides
+                        port = 443,       // dummy, wsUrl overrides
+                        sessionId = sessionId,
+                        sessionKey = sessionKey,
+                        wsUrl = wsUrl,
+                    )
+                    val joinLink = moe.rukamori.archivetune.together.TogetherLink.encode(joinInfo)
+
+                    scheduleTogetherHostInactivityTimeout(sessionId)
+
+                    scope.launch(SilentHandler) {
+                        togetherSessionState.value =
+                            moe.rukamori.archivetune.together.TogetherSessionState.Hosting(
+                                sessionId = sessionId,
+                                joinLink = joinLink,
+                                localAddressHint = "tunnel",
+                                port = port,
+                                settings = settings,
+                                roomState = null,
+                            )
+                    }
+
+                    startBroadcastLoop(server = server, sessionId = sessionId)
+                }
+                is TunnelResult.Error -> {
+                    scope.launch(SilentHandler) {
+                        togetherSessionState.value =
+                            moe.rukamori.archivetune.together.TogetherSessionState.Error(
+                                message = tunnelResult.message,
+                            )
+                    }
+                }
+            }
+        }
+    }
+
+        ioScope.launch(SilentHandler) {
+            stopTogetherInternal()
+            togetherIsOnlineSession = false
+
+            // Generate session details
+            val sessionId = java.util.UUID.randomUUID().toString()
+            val sessionKey = java.util.UUID.randomUUID().toString()
+
+            // Use the same port as LAN (or could be configurable)
+            val port = dataStore.get(TogetherDefaultPortKey, 42117)
+
+            val server = createTogetherServer(
+                port = port,
+                displayName = displayName,
+                settings = settings,
+                sessionId = sessionId,
+                sessionKey = sessionKey,
+            )
+
+            // TODO: Integrate tunnel provider (ngrok, etc.)
+            // For now, use a placeholder URL
+            val tunnelUrl = "wss://your-ngrok-url.ngrok-free.app/together"
+            val wsUrl = tunnelUrl
+
+            // Build join info with wsUrl
+            val joinInfo = moe.rukamori.archivetune.together.TogetherJoinInfo(
+                host = "tunnel",  // dummy, wsUrl overrides
+                port = 443,       // dummy, wsUrl overrides
+                sessionId = sessionId,
+                sessionKey = sessionKey,
+                wsUrl = wsUrl,
+            )
+            val joinLink = moe.rukamori.archivetune.together.TogetherLink.encode(joinInfo)
+
+            scheduleTogetherHostInactivityTimeout(sessionId)
+
+            scope.launch(SilentHandler) {
+                togetherSessionState.value =
+                    moe.rukamori.archivetune.together.TogetherSessionState.Hosting(
+                        sessionId = sessionId,
+                        joinLink = joinLink,
+                        localAddressHint = "tunnel",
+                        port = port,
+                        settings = settings,
+                        roomState = null,
+                    )
+            }
+
+            startBroadcastLoop(server = server, sessionId = sessionId)
+        }
+    }
 
 
     private suspend fun createTogetherServer(
@@ -4642,4 +4762,4 @@ class MusicService :
         private const val ArchiveTuneExtractorCacheFingerprintPrefix = "archivetune_extractor:"
         private const val ArchiveTuneExtractorExpirySafetyMs = 30_000L
     }
-}}
+}
