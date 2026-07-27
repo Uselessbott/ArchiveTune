@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="moe.rukamori.archivetune">
+
+    <application>
+        <activity
+            android:name=".debug.TunnelPrototypeActivity"
+            android:label="Tunnel Prototype"
+            android:exported="true"
+            tools:ignore="ExportedActivity" />
+    </application>
+</manifest>
