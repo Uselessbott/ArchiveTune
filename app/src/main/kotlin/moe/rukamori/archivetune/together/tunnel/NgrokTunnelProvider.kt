@@ -45,7 +45,9 @@ class NgrokTunnelProvider(
                 ?: return TunnelResult.Error("No HTTP/HTTPS tunnel found in ngrok")
 
             val publicUrl = tunnel.public_url.toHttpUrlOrNull()
-                ?: return TunnelResult.Error("Invalid tunnel URL: $publicUrl")
+                ?: return TunnelResult.Error(
+                    "Invalid tunnel URL: ${tunnel.public_url}"
+                )
 
             TunnelResult.Success(publicUrl)
         } catch (e: IOException) {
