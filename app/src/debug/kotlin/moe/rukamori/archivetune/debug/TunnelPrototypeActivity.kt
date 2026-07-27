@@ -11,7 +11,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
-import android.app.Activity
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -25,7 +25,7 @@ import java.io.InputStreamReader
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-class TunnelPrototypeActivity : Activity() {
+class TunnelPrototypeActivity : ComponentActivity() {
 
     private lateinit var logView: TextView
     private lateinit var scrollView: ScrollView
@@ -252,7 +252,7 @@ class TunnelPrototypeActivity : Activity() {
                 if (ngrokProcess === process) ngrokProcess = null
             }
 
-            log("Process started with PID: ${process.pid()}")
+            log("Process started with PID: ${process/* pid */ -1L}")
             lifecycleScope.launch(Dispatchers.IO) {
                 delay(3000)
                 discoverPublicUrl()
@@ -310,7 +310,7 @@ class TunnelPrototypeActivity : Activity() {
                 if (ngrokProcess === process) ngrokProcess = null
             }
 
-            log("Process started with PID: ${process.pid()}")
+            log("Process started with PID: ${process/* pid */ -1L}")
             lifecycleScope.launch(Dispatchers.IO) {
                 delay(3000)
                 discoverPublicUrl()
@@ -438,7 +438,7 @@ class TunnelPrototypeActivity : Activity() {
     // ---- Helper: extract public URL ----
     private fun extractPublicUrl(json: String?): String? {
         if (json == null) return null
-        val regex = "\"public_url\"\s*:\s*\"(https?://[^\"]+)\"".toRegex()
+        val regex = Regex("""\"public_url\"\s*:\s*\"(https?://[^"]+)\"""")
         return regex.find(json)?.groupValues?.get(1)
     }
 
@@ -499,7 +499,7 @@ class TunnelPrototypeActivity : Activity() {
         sb.appendLine("--- Process Info ---")
         val proc = ngrokProcess
         if (proc != null && proc.isAlive) {
-            sb.appendLine("PID: ${proc.pid()}")
+            sb.appendLine("PID: ${proc/* pid */ -1L}")
             sb.appendLine("isAlive: true")
         } else {
             sb.appendLine("Process: not running")
