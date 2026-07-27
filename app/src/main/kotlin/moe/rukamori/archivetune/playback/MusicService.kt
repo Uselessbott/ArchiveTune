@@ -4641,5 +4641,4 @@ class MusicService :
         private const val ArchiveTuneExtractorHost = "moriextractor.koyeb.app"
         private const val ArchiveTuneExtractorCacheFingerprintPrefix = "archivetune_extractor:"
         private const val ArchiveTuneExtractorExpirySafetyMs = 30_000L
-    }
-}}
+}
