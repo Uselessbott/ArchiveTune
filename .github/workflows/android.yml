@@ -24,6 +24,9 @@ jobs:
 
       - run: chmod +x gradlew
 
+      - name: Print Runtime Classpath
+        run: ./gradlew printRuntimeClasspath
+
       - name: Build APK
         run: ./gradlew assembleGmsMobileUniversalDebug
         env:
