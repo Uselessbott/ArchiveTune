@@ -499,7 +499,7 @@ class TunnelPrototypeActivity : ComponentActivity() {
         sb.appendLine("--- Process Info ---")
         val proc = ngrokProcess
         if (proc != null && proc.isAlive) {
-            sb.appendLine("PID: "-"")
+            sb.appendLine("PID: (unknown)")
             sb.appendLine("isAlive: true")
         } else {
             sb.appendLine("Process: not running")
