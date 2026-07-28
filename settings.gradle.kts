@@ -24,6 +24,17 @@ dependencyResolutionManagement {
                 releasesOnly()
             }
         }
+
+        maven {
+            name = "WebRTC"
+            url = uri("https://repo.maven.apache.org/maven2")
+        }
+
+        maven {
+            name = "Liferay"
+            url = uri("https://repository-cdn.liferay.com/nexus/content/repositories/public")
+        }
+
         exclusiveContent {
             forRepository {
                 maven {
