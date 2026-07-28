@@ -145,7 +145,8 @@ class MusicTogetherRepository
                 }
 
                 MusicTogetherConnectionMode.ONLINE -> {
-                    service.startTogetherOnlineHost(
+                    service.startTogetherPersonalHost(
+                        port = port,
                         displayName = displayName,
                         settings = settings,
                     )
