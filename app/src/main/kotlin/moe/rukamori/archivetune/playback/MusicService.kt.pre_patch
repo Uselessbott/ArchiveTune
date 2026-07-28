@@ -275,10 +275,6 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.cos
-import moe.rukamori.archivetune.together.tunnel.NoOpTunnelProvider
-import moe.rukamori.archivetune.together.tunnel.TunnelProvider
-import moe.rukamori.archivetune.together.tunnel.TunnelResult
-import moe.rukamori.archivetune.together.tunnel.NgrokTunnelProvider
 import kotlin.math.pow
 import kotlin.math.roundToLong
 import kotlin.math.sin
@@ -723,12 +719,6 @@ class MusicService :
     private var togetherLastAppliedQueueHash: String? = null
     private var togetherIsOnlineSession: Boolean = false
 
-    private var tunnelProvider: TunnelProvider = NoOpTunnelProvider()
-
-    fun setTunnelProvider(provider: TunnelProvider) {
-        tunnelProvider = provider
-    }
-
     @Volatile
     private var togetherApplyingRemote: Boolean = false
 
@@ -955,7 +945,6 @@ class MusicService :
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .build()
-            setTunnelProvider(NgrokTunnelProvider(extractorMediaOkHttpClient))
             } catch (e: Exception) {
                 reportException(e)
                 return
@@ -4100,7 +4089,6 @@ class MusicService :
         port: Int,
         displayName: String,
         settings: moe.rukamori.archivetune.together.TogetherRoomSettings,
-        wsUrl: String? = null
     ) {
         ensureScopesActive()
         scope.launch(SilentHandler) {
@@ -4120,22 +4108,13 @@ class MusicService :
                 java.util.UUID
                     .randomUUID()
                     .toString()
-            val joinInfo = if (wsUrl != null) {
-                moe.rukamori.archivetune.together.TogetherJoinInfo(
-                    host = "localhost",
-                    port = 443,
-                    sessionId = sessionId,
-                    sessionKey = sessionKey,
-                    wsUrl = wsUrl
-                )
-            } else {
+            val joinInfo =
                 moe.rukamori.archivetune.together.TogetherJoinInfo(
                     host = localIp ?: "127.0.0.1",
                     port = port,
                     sessionId = sessionId,
-                    sessionKey = sessionKey
+                    sessionKey = sessionKey,
                 )
-            }
             val joinLink =
                 moe.rukamori.archivetune.together.TogetherLink
                     .encode(joinInfo)
@@ -4376,39 +4355,6 @@ class MusicService :
                         kotlinx.coroutines.delay(TogetherPlaybackSync.BroadcastIntervalMs)
                     }
                 }
-        }
-    }
-
-    fun startTogetherPersonalHost(
-        port: Int,
-        displayName: String,
-        settings: moe.rukamori.archivetune.together.TogetherRoomSettings
-    ) {
-        ensureScopesActive()
-        scope.launch(SilentHandler) {
-            val result = tunnelProvider.discoverTunnelUrl()
-            when (result) {
-                is TunnelResult.Success -> {
-                    val httpUrl = result.publicUrl
-                    val isDefaultPort =
-                        (httpUrl.scheme == "https" && httpUrl.port == 443) ||
-                        (httpUrl.scheme == "http" && httpUrl.port == 80)
-                    val wsUrl = buildString {
-                        append(if (httpUrl.scheme == "https") "wss://" else "ws://")
-                        append(httpUrl.host)
-                        if (!isDefaultPort) append(":${httpUrl.port}")
-                        append("/together")
-                    }
-                    startTogetherHost(port, displayName, settings, wsUrl = wsUrl)
-                }
-                is TunnelResult.Error -> {
-                    togetherSessionState.value =
-                        moe.rukamori.archivetune.together.TogetherSessionState.Error(
-                            message = result.message,
-                            recoverable = true
-                        )
-                }
-            }
         }
     }
 
