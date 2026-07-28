@@ -10,7 +10,7 @@ def write_file(rel_path, content):
         f.write(content)
     print(f"Written: {full_path}")
 
-# WebRtcPeer.kt – with injected CoroutineScope, non-null flows, proper cleanup
+# WebRtcPeer.kt – pure transport: no isHost, no auto-reply
 write_file(
     "together/webrtc/WebRtcPeer.kt",
     """package moe.rukamori.archivetune.together.webrtc
@@ -188,7 +188,7 @@ class WebRtcPeer(
 """
 )
 
-# WebRtcTransport.kt – own non-null flows, forward from peer, pass scope
+# WebRtcTransport.kt – pure transport without test logic
 write_file(
     "together/webrtc/WebRtcTransport.kt",
     """package moe.rukamori.archivetune.together.webrtc
@@ -199,7 +199,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -382,4 +381,67 @@ class WebRtcTransport @Inject constructor(
 """
 )
 
-print("DataChannel foundation with proper scopes and flows written successfully.")
+# WebRtcTransportTestHelper.kt – two helpers: host ping sender and guest ping responder
+write_file(
+    "together/webrtc/WebRtcTransportTestHelper.kt",
+    """package moe.rukamori.archivetune.together.webrtc
+
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withTimeoutOrNull
+import org.webrtc.DataChannel
+
+object WebRtcTransportTestHelper {
+
+    /**
+     * Guest-side ping responder.
+     * Listens for incoming "ping" messages and replies with "pong".
+     * Should be launched in a coroutine.
+     */
+    suspend fun runGuestPingResponder(transport: WebRtcTransport) {
+        transport.receivedMessages.collect { message ->
+            if (message == "ping") {
+                transport.sendText("pong")
+            }
+        }
+    }
+
+    /**
+     * Host-side ping test.
+     * Waits for DataChannel to be OPEN, sends "ping", and waits for "pong".
+     * Returns true if "pong" is received within the timeout, false otherwise.
+     */
+    suspend fun runHostPingTest(
+        transport: WebRtcTransport,
+        timeoutMillis: Long = 5000
+    ): Boolean {
+        // Wait for DataChannel to be open
+        val open = withTimeoutOrNull(timeoutMillis) {
+            transport.connectionState.first { it == DataChannel.State.OPEN }
+        }
+        if (open == null) {
+            return false // timed out waiting for open
+        }
+
+        // Send ping
+        transport.sendText("ping")
+
+        // Wait for pong
+        val pong = withTimeoutOrNull(timeoutMillis) {
+            transport.receivedMessages.first { it == "pong" }
+        }
+        return pong != null
+    }
+}
+"""
+)
+
+print("========================================")
+print("PHASE 5 COMPLETED")
+print("NEXT PHASE: 6")
+print("DO NOT CONTINUE UNTIL USER CONFIRMS.")
+print("========================================")
