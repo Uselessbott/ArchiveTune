@@ -1,57 +1,42 @@
-name: Build Debug APK
+name: Build Single APK
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
-  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository (with submodules)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
-          submodules: recursive
+          submodules: true
 
-      - name: Verify submodules
-        run: |
-          echo "=== Git Submodules ==="
-          git submodule status
-
-          echo
-          echo "=== Lyrics directory ==="
-          ls -la lyrics || true
-
-          echo
-          echo "=== BetterLyrics directory ==="
-          ls -la lyrics/betterlyrics || true
-
-          echo
-          echo "=== BetterLyrics tree ==="
-          find lyrics/betterlyrics -maxdepth 2 || true
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
-          distribution: temurin
-          java-version: "21"
-          cache: gradle
+          java-version: '21'
+          distribution: 'temurin'
 
-      - name: Make Gradle executable
-        run: chmod +x gradlew
+      - uses: gradle/actions/setup-gradle@v6
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - run: chmod +x gradlew
 
-      - name: Upload Debug APK
-        if: success()
-        uses: actions/upload-artifact@v4
+      - name: Build APK
+        run: ./gradlew assembleGmsMobileUniversalRelease
+        env:
+          API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
+          TOGETHER_BEARER_TOKEN: ${{ secrets.TOGETHER_BEARER_TOKEN }}
+          CANVAS_BEARER_TOKEN: ${{ secrets.CANVAS_BEARER_TOKEN }}
+          EXTRACTOR_BEARER: ${{ secrets.EXTRACTOR_BEARER }}
+          START_IO_APP_ID: ${{ secrets.START_IO_APP_ID }}
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: ArchiveTune-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: ArchiveTune-GMS-Mobile-Universal-Release
+          path: |
+            app/build/outputs/apk/gms/mobile/universal/release/*.apk
+            app/build/outputs/apk/gmsMobileUniversal/release/*.apk
+            app/build/outputs/apk/mobile/universal/release/*.apk
+            app/build/outputs/apk/mobileUniversal/release/*.apk
