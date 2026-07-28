@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feature/webrtc-together
 
 jobs:
   build:
