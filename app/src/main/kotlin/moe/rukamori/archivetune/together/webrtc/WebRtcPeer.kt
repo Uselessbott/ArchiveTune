@@ -1,6 +1,9 @@
 package moe.rukamori.archivetune.together.webrtc
 
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.PeerConnection
 import org.webrtc.SdpObserver
@@ -11,6 +14,9 @@ import kotlin.coroutines.resumeWithException
 class WebRtcPeer(
     val peerConnection: PeerConnection
 ) {
+    private val _localIceCandidates = MutableSharedFlow<IceCandidateDto>(extraBufferCapacity = 64)
+    val localIceCandidates: SharedFlow<IceCandidateDto> = _localIceCandidates
+
     suspend fun createOffer(): SessionDescription = suspendCancellableCoroutine { continuation ->
         val observer = createSdpObserver(continuation)
         peerConnection.createOffer(observer, MediaConstraints())
@@ -29,6 +35,19 @@ class WebRtcPeer(
     suspend fun setRemoteDescription(sdp: SessionDescription): Unit = suspendCancellableCoroutine { continuation ->
         val observer = createSetSdpObserver(continuation)
         peerConnection.setRemoteDescription(observer, sdp)
+    }
+
+    fun addIceCandidate(candidate: IceCandidate): Boolean {
+        return peerConnection.addIceCandidate(candidate)
+    }
+
+    suspend fun emitLocalIceCandidate(candidate: IceCandidate) {
+        val dto = IceCandidateDto(
+            candidate = candidate.sdp,
+            sdpMid = candidate.sdpMid,
+            sdpMLineIndex = candidate.sdpMLineIndex
+        )
+        _localIceCandidates.emit(dto)
     }
 
     private fun createSdpObserver(continuation: kotlin.coroutines.Continuation<SessionDescription>): SdpObserver {

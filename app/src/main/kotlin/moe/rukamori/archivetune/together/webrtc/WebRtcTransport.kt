@@ -4,6 +4,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaStream
@@ -19,6 +22,9 @@ class WebRtcTransport @Inject constructor(
 ) {
     private var currentPeer: WebRtcPeer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val _localIceCandidates = MutableSharedFlow<IceCandidateDto>(extraBufferCapacity = 64)
+    val localIceCandidates: SharedFlow<IceCandidateDto> = _localIceCandidates
 
     fun host(listener: (status: String) -> Unit = {}) {
         disconnect()
@@ -58,10 +64,31 @@ class WebRtcTransport @Inject constructor(
         peer.setRemoteDescription(sdp)
     }
 
+    suspend fun addRemoteIceCandidate(candidate: IceCandidateDto) {
+        val peer = currentPeer ?: throw IllegalStateException("No active peer")
+        val iceCandidate = IceCandidate(
+            candidate.sdpMid,
+            candidate.sdpMLineIndex,
+            candidate.candidate
+        )
+        if (!peer.addIceCandidate(iceCandidate)) {
+            throw IllegalStateException("Failed to add remote ICE candidate")
+        }
+    }
+
     private fun createPeer() {
         val observer = object : PeerConnection.Observer {
             override fun onIceCandidate(candidate: IceCandidate?) {
-                // Will be used for signalling in future phase
+                if (candidate != null) {
+                    val dto = IceCandidateDto(
+                        candidate = candidate.sdp,
+                        sdpMid = candidate.sdpMid,
+                        sdpMLineIndex = candidate.sdpMLineIndex
+                    )
+                    scope.launch {
+                        _localIceCandidates.emit(dto)
+                    }
+                }
             }
 
             override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {
