@@ -10,11 +10,12 @@ def write_file(rel_path, content):
         f.write(content)
     print(f"Written: {full_path}")
 
-# WebRtcPeer.kt – pure transport: no isHost, no auto-reply
+# WebRtcPeer.kt – replace String with TogetherMessage, with logging
 write_file(
     "together/webrtc/WebRtcPeer.kt",
     """package moe.rukamori.archivetune.together.webrtc
 
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import moe.rukamori.archivetune.together.TogetherJson
+import moe.rukamori.archivetune.together.TogetherMessage
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
@@ -33,6 +36,8 @@ import org.webrtc.SessionDescription
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+private const val TAG = "WebRtcPeer"
 
 class WebRtcPeer(
     val peerConnection: PeerConnection,
@@ -82,8 +87,8 @@ class WebRtcPeer(
     private val _connectionState = MutableStateFlow<DataChannel.State?>(null)
     val connectionState: StateFlow<DataChannel.State?> = _connectionState.asStateFlow()
 
-    private val _receivedMessages = MutableSharedFlow<String>(extraBufferCapacity = 64)
-    val receivedMessages: SharedFlow<String> = _receivedMessages.asSharedFlow()
+    private val _receivedMessages = MutableSharedFlow<TogetherMessage>(extraBufferCapacity = 64)
+    val receivedMessages: SharedFlow<TogetherMessage> = _receivedMessages.asSharedFlow()
 
     fun setDataChannel(channel: DataChannel) {
         dataChannel = channel
@@ -102,10 +107,11 @@ class WebRtcPeer(
         return channel
     }
 
-    fun sendText(text: String): Boolean {
+    fun sendMessage(message: TogetherMessage): Boolean {
         val channel = dataChannel ?: return false
         if (channel.state() != DataChannel.State.OPEN) return false
-        val bytes = text.encodeToByteArray()
+        val jsonString = TogetherJson.json.encodeToString(TogetherMessage.serializer(), message)
+        val bytes = jsonString.encodeToByteArray()
         val buffer = ByteBuffer.wrap(bytes)
         return channel.send(DataChannel.Buffer(buffer, false))
     }
@@ -126,9 +132,14 @@ class WebRtcPeer(
             override fun onMessage(buffer: DataChannel.Buffer) {
                 val bytes = ByteArray(buffer.data.remaining())
                 buffer.data.get(bytes)
-                val text = String(bytes, Charsets.UTF_8)
-                scope.launch {
-                    _receivedMessages.emit(text)
+                val jsonString = String(bytes, Charsets.UTF_8)
+                try {
+                    val message = TogetherJson.json.decodeFromString(TogetherMessage.serializer(), jsonString)
+                    scope.launch {
+                        _receivedMessages.emit(message)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to deserialize TogetherMessage: $jsonString", e)
                 }
             }
         }
@@ -188,7 +199,7 @@ class WebRtcPeer(
 """
 )
 
-# WebRtcTransport.kt – pure transport without test logic
+# WebRtcTransport.kt – replace String with TogetherMessage, use StateFlow for connection state
 write_file(
     "together/webrtc/WebRtcTransport.kt",
     """package moe.rukamori.archivetune.together.webrtc
@@ -198,10 +209,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import moe.rukamori.archivetune.together.TogetherMessage
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaStream
@@ -222,12 +237,13 @@ class WebRtcTransport @Inject constructor(
     private val _localIceCandidates = MutableSharedFlow<IceCandidateDto>(extraBufferCapacity = 64)
     val localIceCandidates: SharedFlow<IceCandidateDto> = _localIceCandidates
 
-    // DataChannel state and messages - own non-null flows
-    private val _connectionState = MutableSharedFlow<DataChannel.State>(extraBufferCapacity = 64)
-    val connectionState: SharedFlow<DataChannel.State> = _connectionState
+    // DataChannel state - own StateFlow for current state
+    private val _connectionState = MutableStateFlow<DataChannel.State?>(null)
+    val connectionState: StateFlow<DataChannel.State?> = _connectionState.asStateFlow()
 
-    private val _receivedMessages = MutableSharedFlow<String>(extraBufferCapacity = 64)
-    val receivedMessages: SharedFlow<String> = _receivedMessages
+    // Messages
+    private val _receivedMessages = MutableSharedFlow<TogetherMessage>(extraBufferCapacity = 64)
+    val receivedMessages: SharedFlow<TogetherMessage> = _receivedMessages
 
     private var peerStateJob: kotlinx.coroutines.Job? = null
     private var peerMessageJob: kotlinx.coroutines.Job? = null
@@ -286,10 +302,10 @@ class WebRtcTransport @Inject constructor(
         }
     }
 
-    fun sendText(text: String) {
+    fun sendMessage(message: TogetherMessage) {
         val peer = currentPeer ?: throw IllegalStateException("No active peer")
-        if (!peer.sendText(text)) {
-            throw IllegalStateException("Failed to send text; DataChannel not open or not set")
+        if (!peer.sendMessage(message)) {
+            throw IllegalStateException("Failed to send message; DataChannel not open or not set")
         }
     }
 
@@ -365,9 +381,7 @@ class WebRtcTransport @Inject constructor(
         // Forward state and messages from peer to transport flows
         peerStateJob = peer.connectionState
             .onEach { state ->
-                if (state != null) {
-                    _connectionState.emit(state)
-                }
+                _connectionState.value = state
             }
             .launchIn(scope)
 
@@ -381,67 +395,14 @@ class WebRtcTransport @Inject constructor(
 """
 )
 
-# WebRtcTransportTestHelper.kt – two helpers: host ping sender and guest ping responder
-write_file(
-    "together/webrtc/WebRtcTransportTestHelper.kt",
-    """package moe.rukamori.archivetune.together.webrtc
-
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.withTimeoutOrNull
-import org.webrtc.DataChannel
-
-object WebRtcTransportTestHelper {
-
-    /**
-     * Guest-side ping responder.
-     * Listens for incoming "ping" messages and replies with "pong".
-     * Should be launched in a coroutine.
-     */
-    suspend fun runGuestPingResponder(transport: WebRtcTransport) {
-        transport.receivedMessages.collect { message ->
-            if (message == "ping") {
-                transport.sendText("pong")
-            }
-        }
-    }
-
-    /**
-     * Host-side ping test.
-     * Waits for DataChannel to be OPEN, sends "ping", and waits for "pong".
-     * Returns true if "pong" is received within the timeout, false otherwise.
-     */
-    suspend fun runHostPingTest(
-        transport: WebRtcTransport,
-        timeoutMillis: Long = 5000
-    ): Boolean {
-        // Wait for DataChannel to be open
-        val open = withTimeoutOrNull(timeoutMillis) {
-            transport.connectionState.first { it == DataChannel.State.OPEN }
-        }
-        if (open == null) {
-            return false // timed out waiting for open
-        }
-
-        // Send ping
-        transport.sendText("ping")
-
-        // Wait for pong
-        val pong = withTimeoutOrNull(timeoutMillis) {
-            transport.receivedMessages.first { it == "pong" }
-        }
-        return pong != null
-    }
-}
-"""
-)
+# Remove test helper if present
+test_helper = BASE / "together/webrtc/WebRtcTransportTestHelper.kt"
+if test_helper.exists():
+    test_helper.unlink()
+    print(f"Removed obsolete: {test_helper}")
 
 print("========================================")
-print("PHASE 5 COMPLETED")
-print("NEXT PHASE: 6")
+print("PHASE 6/11 COMPLETED")
+print("NEXT PHASE: 7")
 print("DO NOT CONTINUE UNTIL USER CONFIRMS.")
 print("========================================")

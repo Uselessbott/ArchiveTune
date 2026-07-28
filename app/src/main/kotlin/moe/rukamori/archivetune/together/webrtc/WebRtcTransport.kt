@@ -5,10 +5,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import moe.rukamori.archivetune.together.TogetherMessage
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaStream
@@ -29,12 +33,13 @@ class WebRtcTransport @Inject constructor(
     private val _localIceCandidates = MutableSharedFlow<IceCandidateDto>(extraBufferCapacity = 64)
     val localIceCandidates: SharedFlow<IceCandidateDto> = _localIceCandidates
 
-    // DataChannel state and messages - own non-null flows
-    private val _connectionState = MutableSharedFlow<DataChannel.State>(extraBufferCapacity = 64)
-    val connectionState: SharedFlow<DataChannel.State> = _connectionState
+    // DataChannel state - own StateFlow for current state
+    private val _connectionState = MutableStateFlow<DataChannel.State?>(null)
+    val connectionState: StateFlow<DataChannel.State?> = _connectionState.asStateFlow()
 
-    private val _receivedMessages = MutableSharedFlow<String>(extraBufferCapacity = 64)
-    val receivedMessages: SharedFlow<String> = _receivedMessages
+    // Messages
+    private val _receivedMessages = MutableSharedFlow<TogetherMessage>(extraBufferCapacity = 64)
+    val receivedMessages: SharedFlow<TogetherMessage> = _receivedMessages
 
     private var peerStateJob: kotlinx.coroutines.Job? = null
     private var peerMessageJob: kotlinx.coroutines.Job? = null
@@ -93,10 +98,10 @@ class WebRtcTransport @Inject constructor(
         }
     }
 
-    fun sendText(text: String) {
+    fun sendMessage(message: TogetherMessage) {
         val peer = currentPeer ?: throw IllegalStateException("No active peer")
-        if (!peer.sendText(text)) {
-            throw IllegalStateException("Failed to send text; DataChannel not open or not set")
+        if (!peer.sendMessage(message)) {
+            throw IllegalStateException("Failed to send message; DataChannel not open or not set")
         }
     }
 
@@ -172,9 +177,7 @@ class WebRtcTransport @Inject constructor(
         // Forward state and messages from peer to transport flows
         peerStateJob = peer.connectionState
             .onEach { state ->
-                if (state != null) {
-                    _connectionState.emit(state)
-                }
+                _connectionState.value = state
             }
             .launchIn(scope)
 

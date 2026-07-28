@@ -1,5 +1,6 @@
 package moe.rukamori.archivetune.together.webrtc
 
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,6 +10,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import moe.rukamori.archivetune.together.TogetherJson
+import moe.rukamori.archivetune.together.TogetherMessage
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
@@ -18,6 +21,8 @@ import org.webrtc.SessionDescription
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+private const val TAG = "WebRtcPeer"
 
 class WebRtcPeer(
     val peerConnection: PeerConnection,
@@ -67,8 +72,8 @@ class WebRtcPeer(
     private val _connectionState = MutableStateFlow<DataChannel.State?>(null)
     val connectionState: StateFlow<DataChannel.State?> = _connectionState.asStateFlow()
 
-    private val _receivedMessages = MutableSharedFlow<String>(extraBufferCapacity = 64)
-    val receivedMessages: SharedFlow<String> = _receivedMessages.asSharedFlow()
+    private val _receivedMessages = MutableSharedFlow<TogetherMessage>(extraBufferCapacity = 64)
+    val receivedMessages: SharedFlow<TogetherMessage> = _receivedMessages.asSharedFlow()
 
     fun setDataChannel(channel: DataChannel) {
         dataChannel = channel
@@ -87,10 +92,11 @@ class WebRtcPeer(
         return channel
     }
 
-    fun sendText(text: String): Boolean {
+    fun sendMessage(message: TogetherMessage): Boolean {
         val channel = dataChannel ?: return false
         if (channel.state() != DataChannel.State.OPEN) return false
-        val bytes = text.encodeToByteArray()
+        val jsonString = TogetherJson.json.encodeToString(TogetherMessage.serializer(), message)
+        val bytes = jsonString.encodeToByteArray()
         val buffer = ByteBuffer.wrap(bytes)
         return channel.send(DataChannel.Buffer(buffer, false))
     }
@@ -111,9 +117,14 @@ class WebRtcPeer(
             override fun onMessage(buffer: DataChannel.Buffer) {
                 val bytes = ByteArray(buffer.data.remaining())
                 buffer.data.get(bytes)
-                val text = String(bytes, Charsets.UTF_8)
-                scope.launch {
-                    _receivedMessages.emit(text)
+                val jsonString = String(bytes, Charsets.UTF_8)
+                try {
+                    val message = TogetherJson.json.decodeFromString(TogetherMessage.serializer(), jsonString)
+                    scope.launch {
+                        _receivedMessages.emit(message)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to deserialize TogetherMessage: $jsonString", e)
                 }
             }
         }
