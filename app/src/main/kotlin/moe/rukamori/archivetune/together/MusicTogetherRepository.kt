@@ -34,6 +34,7 @@ import javax.inject.Singleton
 enum class MusicTogetherConnectionMode {
     LAN,
     ONLINE,
+    CUSTOM,
 }
 
 data class MusicTogetherPreferences(
@@ -150,6 +151,14 @@ class MusicTogetherRepository
                         settings = settings,
                     )
                 }
+
+                MusicTogetherConnectionMode.CUSTOM -> {
+                    service.startTogetherCustomHost(
+                        port = port,
+                        displayName = displayName,
+                        settings = settings,
+                    )
+                }
             }
         }
 
@@ -162,6 +171,7 @@ class MusicTogetherRepository
             when (mode) {
                 MusicTogetherConnectionMode.LAN -> service.joinTogether(rawInput, displayName)
                 MusicTogetherConnectionMode.ONLINE -> service.joinTogetherOnline(rawInput, displayName)
+                MusicTogetherConnectionMode.CUSTOM -> service.joinTogetherCustom(rawInput, displayName)
             }
         }
 

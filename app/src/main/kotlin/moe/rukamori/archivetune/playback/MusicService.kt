@@ -4358,6 +4358,22 @@ class MusicService :
         }
     }
 
+
+    fun startTogetherCustomHost(
+        port: Int,
+        displayName: String,
+        settings: moe.rukamori.archivetune.together.TogetherRoomSettings,
+    ) {
+        throw NotImplementedError("Custom Together host not implemented yet")
+    }
+
+    fun joinTogetherCustom(
+        rawInput: String,
+        displayName: String,
+    ) {
+        throw NotImplementedError("Custom Together join not implemented yet")
+    }
+
     fun joinTogether(
         rawLink: String,
         displayName: String,
