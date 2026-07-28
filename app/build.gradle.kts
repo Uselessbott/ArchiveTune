@@ -482,3 +482,21 @@ configurations.configureEach {
         "org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlinMetadata.get()}",
     )
 }
+
+
+tasks.register("printRuntimeClasspath") {
+    doLast {
+        println("========== Runtime Artifacts ==========")
+
+        configurations
+            .getByName("gmsMobileUniversalDebugRuntimeClasspath")
+            .resolvedConfiguration
+            .resolvedArtifacts
+            .sortedBy { it.moduleVersion.id.toString() }
+            .forEach {
+                println("${it.moduleVersion.id} -> ${it.file.absolutePath}")
+            }
+
+        println("=======================================")
+    }
+}
