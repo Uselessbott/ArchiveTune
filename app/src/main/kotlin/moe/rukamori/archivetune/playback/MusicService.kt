@@ -955,7 +955,6 @@ class MusicService :
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .build()
-            setTunnelProvider(NgrokTunnelProvider(extractorMediaOkHttpClient))
             } catch (e: Exception) {
                 reportException(e)
                 return
@@ -1042,6 +1041,9 @@ class MusicService :
 
     override fun onCreate() {
         super.onCreate()
+        setTunnelProvider(
+            NgrokTunnelProvider(extractorMediaOkHttpClient)
+        )
         equalizerPlaybackController.attach(this)
         ensureScopesActive()
 

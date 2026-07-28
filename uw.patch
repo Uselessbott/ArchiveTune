@@ -1,0 +1,37 @@
+--- a/app/src/main/kotlin/moe/rukamori/archivetune/playback/MusicService.kt
++++ b/app/src/main/kotlin/moe/rukamori/archivetune/playback/MusicService.kt
+@@
+-                NotificationCompat
+-                    .Builder(this, CHANNEL_ID)
+-                    .setSmallIcon(R.drawable.small_icon)
+-                    .setContentTitle(getString(R.string.music_player))
+-                    .setContentText(getString(R.string.app_name))
+-                    .setContentIntent(contentIntent)
+-                    .setCategory(Notification.CATEGORY_SERVICE)
+-                    .setPriority(NotificationCompat.PRIORITY_LOW)
+-                    .setOngoing(true)
+-                    .setOnlyAlertOnce(true)
+-                    .build()
+-            setTunnelProvider(NgrokTunnelProvider(extractorMediaOkHttpClient))
++                NotificationCompat
++                    .Builder(this, CHANNEL_ID)
++                    .setSmallIcon(R.drawable.small_icon)
++                    .setContentTitle(getString(R.string.music_player))
++                    .setContentText(getString(R.string.app_name))
++                    .setContentIntent(contentIntent)
++                    .setCategory(Notification.CATEGORY_SERVICE)
++                    .setPriority(NotificationCompat.PRIORITY_LOW)
++                    .setOngoing(true)
++                    .setOnlyAlertOnce(true)
++                    .build()
+             } catch (e: Exception) {
+                 reportException(e)
+                 return
+             }
+@@
+     override fun onCreate() {
+         super.onCreate()
++
++        setTunnelProvider(
++            NgrokTunnelProvider(extractorMediaOkHttpClient)
++        )
