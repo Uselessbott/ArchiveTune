@@ -1,22 +1,29 @@
 package moe.rukamori.archivetune.together.webrtc
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.PeerConnection
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
+import java.nio.ByteBuffer
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class WebRtcPeer(
-    val peerConnection: PeerConnection
+    val peerConnection: PeerConnection,
+    private val scope: CoroutineScope
 ) {
-    private val _localIceCandidates = MutableSharedFlow<IceCandidateDto>(extraBufferCapacity = 64)
-    val localIceCandidates: SharedFlow<IceCandidateDto> = _localIceCandidates
-
+    // SDP methods
     suspend fun createOffer(): SessionDescription = suspendCancellableCoroutine { continuation ->
         val observer = createSdpObserver(continuation)
         peerConnection.createOffer(observer, MediaConstraints())
@@ -41,6 +48,10 @@ class WebRtcPeer(
         return peerConnection.addIceCandidate(candidate)
     }
 
+    // ICE candidates
+    private val _localIceCandidates = MutableSharedFlow<IceCandidateDto>(extraBufferCapacity = 64)
+    val localIceCandidates: SharedFlow<IceCandidateDto> = _localIceCandidates
+
     suspend fun emitLocalIceCandidate(candidate: IceCandidate) {
         val dto = IceCandidateDto(
             candidate = candidate.sdp,
@@ -48,6 +59,64 @@ class WebRtcPeer(
             sdpMLineIndex = candidate.sdpMLineIndex
         )
         _localIceCandidates.emit(dto)
+    }
+
+    // DataChannel
+    private var dataChannel: DataChannel? = null
+
+    private val _connectionState = MutableStateFlow<DataChannel.State?>(null)
+    val connectionState: StateFlow<DataChannel.State?> = _connectionState.asStateFlow()
+
+    private val _receivedMessages = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    val receivedMessages: SharedFlow<String> = _receivedMessages.asSharedFlow()
+
+    fun setDataChannel(channel: DataChannel) {
+        dataChannel = channel
+        val observer = createDataChannelObserver()
+        channel.registerObserver(observer)
+        _connectionState.value = channel.state()
+    }
+
+    fun createDataChannel(label: String = "archivetune"): DataChannel {
+        val init = DataChannel.Init().apply {
+            ordered = true
+        }
+        val channel = peerConnection.createDataChannel(label, init)
+            ?: throw IllegalStateException("Failed to create DataChannel")
+        setDataChannel(channel)
+        return channel
+    }
+
+    fun sendText(text: String): Boolean {
+        val channel = dataChannel ?: return false
+        if (channel.state() != DataChannel.State.OPEN) return false
+        val bytes = text.encodeToByteArray()
+        val buffer = ByteBuffer.wrap(bytes)
+        return channel.send(DataChannel.Buffer(buffer, false))
+    }
+
+    private fun createDataChannelObserver(): DataChannel.Observer {
+        return object : DataChannel.Observer {
+            override fun onBufferedAmountChange(previousAmount: Long) {
+                // Ignore
+            }
+
+            override fun onStateChange() {
+                val channel = dataChannel
+                if (channel != null) {
+                    _connectionState.value = channel.state()
+                }
+            }
+
+            override fun onMessage(buffer: DataChannel.Buffer) {
+                val bytes = ByteArray(buffer.data.remaining())
+                buffer.data.get(bytes)
+                val text = String(bytes, Charsets.UTF_8)
+                scope.launch {
+                    _receivedMessages.emit(text)
+                }
+            }
+        }
     }
 
     private fun createSdpObserver(continuation: kotlin.coroutines.Continuation<SessionDescription>): SdpObserver {
@@ -95,6 +164,8 @@ class WebRtcPeer(
     }
 
     fun close() {
+        dataChannel?.close()
+        dataChannel = null
         peerConnection.close()
         peerConnection.dispose()
     }

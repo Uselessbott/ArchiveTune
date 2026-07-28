@@ -6,6 +6,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
@@ -23,22 +26,37 @@ class WebRtcTransport @Inject constructor(
     private var currentPeer: WebRtcPeer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // ICE candidates - own non-null flow
     private val _localIceCandidates = MutableSharedFlow<IceCandidateDto>(extraBufferCapacity = 64)
     val localIceCandidates: SharedFlow<IceCandidateDto> = _localIceCandidates
 
+    // DataChannel state and messages - own non-null flows
+    private val _connectionState = MutableSharedFlow<DataChannel.State>(extraBufferCapacity = 64)
+    val connectionState: SharedFlow<DataChannel.State> = _connectionState
+
+    private val _receivedMessages = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    val receivedMessages: SharedFlow<String> = _receivedMessages
+
+    private var peerStateJob: kotlinx.coroutines.Job? = null
+    private var peerMessageJob: kotlinx.coroutines.Job? = null
+
     fun host(listener: (status: String) -> Unit = {}) {
         disconnect()
-        createPeer()
+        createPeer(isHost = true)
         listener("Host peer created")
     }
 
     fun join(listener: (status: String) -> Unit = {}) {
         disconnect()
-        createPeer()
+        createPeer(isHost = false)
         listener("Guest peer created")
     }
 
     fun disconnect() {
+        peerStateJob?.cancel()
+        peerStateJob = null
+        peerMessageJob?.cancel()
+        peerMessageJob = null
         currentPeer?.close()
         currentPeer = null
         scope.coroutineContext.cancelChildren()
@@ -76,7 +94,14 @@ class WebRtcTransport @Inject constructor(
         }
     }
 
-    private fun createPeer() {
+    fun sendText(text: String) {
+        val peer = currentPeer ?: throw IllegalStateException("No active peer")
+        if (!peer.sendText(text)) {
+            throw IllegalStateException("Failed to send text; DataChannel not open or not set")
+        }
+    }
+
+    private fun createPeer(isHost: Boolean) {
         val observer = object : PeerConnection.Observer {
             override fun onIceCandidate(candidate: IceCandidate?) {
                 if (candidate != null) {
@@ -112,7 +137,7 @@ class WebRtcTransport @Inject constructor(
             }
 
             override fun onAddStream(stream: MediaStream?) {
-                // Not used for data-only
+                // Not used
             }
 
             override fun onRemoveStream(stream: MediaStream?) {
@@ -120,7 +145,12 @@ class WebRtcTransport @Inject constructor(
             }
 
             override fun onDataChannel(channel: DataChannel?) {
-                // Will be used for DataChannel in a later phase
+                if (!isHost && channel != null) {
+                    val peer = currentPeer
+                    if (peer != null) {
+                        peer.setDataChannel(channel)
+                    }
+                }
             }
 
             override fun onRenegotiationNeeded() {
@@ -133,6 +163,26 @@ class WebRtcTransport @Inject constructor(
         }
 
         val peerConnection = peerFactory.createPeerConnection(observer)
-        currentPeer = WebRtcPeer(peerConnection)
+        val peer = WebRtcPeer(peerConnection, scope)
+        currentPeer = peer
+
+        if (isHost) {
+            peer.createDataChannel()
+        }
+
+        // Forward state and messages from peer to transport flows
+        peerStateJob = peer.connectionState
+            .onEach { state ->
+                if (state != null) {
+                    _connectionState.emit(state)
+                }
+            }
+            .launchIn(scope)
+
+        peerMessageJob = peer.receivedMessages
+            .onEach { message ->
+                _receivedMessages.emit(message)
+            }
+            .launchIn(scope)
     }
 }
