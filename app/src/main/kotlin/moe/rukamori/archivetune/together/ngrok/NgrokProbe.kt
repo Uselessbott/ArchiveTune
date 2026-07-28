@@ -6,21 +6,8 @@ import timber.log.Timber
 object NgrokProbe {
 
     fun run() {
-        Timber.i("========== NGROK PROBE START ==========")
-
-        val candidates = listOf(
-            "com.ngrok.Session",
-            "com.ngrok.Ngrok",
-            "com.ngrok.HttpTunnel",
-            "com.ngrok.TcpTunnel"
-        )
-
-        for (name in candidates) {
-            try {
-                val clazz = Class.forName(name)
-                Timber.i("FOUND: $name")
-                Timber.i("Loader: ${clazz.classLoader}")
-            } catch (t: Throwable) {
+        throw RuntimeException("NGROK PROBE EXECUTED")
+    } catch (t: Throwable) {
                 Timber.e(t, "Missing: $name")
             }
         }
