@@ -414,6 +414,8 @@ dependencies {
     implementation(libs.accompanist.lyrics.core)
 
     implementation("org.json:json:20240303")
+
+    implementation("com.ngrok:ngrok-java-17:1.1.1")
 }
 
 androidComponents {
