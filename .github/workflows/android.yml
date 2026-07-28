@@ -25,7 +25,7 @@ jobs:
       - run: chmod +x gradlew
 
       - name: Build APK
-        run: ./gradlew assembleGmsMobileUniversalRelease
+        run: ./gradlew assembleGmsMobileUniversalDebug
         env:
           API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
@@ -37,9 +37,9 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ArchiveTune-GMS-Mobile-Universal-Release
+          name: ArchiveTune-GMS-Mobile-Universal-Debug
           path: |
-            app/build/outputs/apk/gms/mobile/universal/release/*.apk
-            app/build/outputs/apk/gmsMobileUniversal/release/*.apk
-            app/build/outputs/apk/mobile/universal/release/*.apk
-            app/build/outputs/apk/mobileUniversal/release/*.apk
+            app/build/outputs/apk/gms/mobile/universal/debug/*.apk
+            app/build/outputs/apk/gmsMobileUniversal/debug/*.apk
+            app/build/outputs/apk/mobile/universal/debug/*.apk
+            app/build/outputs/apk/mobileUniversal/debug/*.apk
