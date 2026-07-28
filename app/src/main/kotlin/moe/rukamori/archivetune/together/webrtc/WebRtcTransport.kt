@@ -15,6 +15,7 @@ import org.webrtc.PeerConnection
 import org.webrtc.RtpReceiver
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.cancelChildren
 
 @Singleton
 class WebRtcTransport @Inject constructor(
