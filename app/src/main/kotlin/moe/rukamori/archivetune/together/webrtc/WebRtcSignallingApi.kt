@@ -1,3 +1,7 @@
 package moe.rukamori.archivetune.together.webrtc
 
-class WebRtcSignallingApi
+// Placeholder interface for future signalling implementation.
+// Will replace TogetherOnlineApi for SDP/ICE exchange.
+interface WebRtcSignallingApi {
+    // Future methods: sendOffer, sendAnswer, sendIceCandidate, etc.
+}
