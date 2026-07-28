@@ -303,6 +303,7 @@ ksp {
 }
 
 dependencies {
+    implementation("org.webrtc:google-webrtc:1.0.32006")
     implementation(libs.guava)
     implementation(libs.coroutines.guava)
     implementation(libs.concurrent.futures)
