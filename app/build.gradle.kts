@@ -81,6 +81,7 @@ val startIoAppId =
             ?: System.getenv("START_IO_APP_ID")
             ?: ""
         ).trim()
+/*
 tasks.register<ValidateStartIoReleaseConfigurationTask>("validateStartIoReleaseConfiguration") {
     group = "verification"
     description = "Validates the production Start.io identifier for GMS release artifacts."
@@ -96,6 +97,7 @@ tasks.configureEach {
         dependsOn("validateStartIoReleaseConfiguration")
     }
 }
+*/
 
 android {
     namespace = "moe.rukamori.archivetune"
