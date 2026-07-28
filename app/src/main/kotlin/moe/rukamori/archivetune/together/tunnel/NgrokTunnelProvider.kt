@@ -21,11 +21,11 @@ private data class NgrokTunnelsResponse(
 
 class NgrokTunnelProvider(
     private val client: OkHttpClient,
-) : CustomTunnelProvider {
+) : TunnelProvider {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    override suspend fun discoverTunnelUrl(): CustomTunnelResult {
+    override suspend fun discoverTunnelUrl(): TunnelResult {
         return try {
             val request = Request.Builder()
                 .url("http://127.0.0.1:4040/api/tunnels")
@@ -34,26 +34,26 @@ class NgrokTunnelProvider(
 
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
-                return CustomTunnelResult.Error("Ngrok API returned ${response.code}")
+                return TunnelResult.Error("Ngrok API returned ${response.code}")
             }
 
-            val body = response.body?.string() ?: return CustomTunnelResult.Error("Empty response from ngrok")
+            val body = response.body?.string() ?: return TunnelResult.Error("Empty response from ngrok")
             val parsed = json.decodeFromString<NgrokTunnelsResponse>(body)
 
             val tunnel = parsed.tunnels
                 .firstOrNull { it.proto == "https" || it.proto == "http" }
-                ?: return CustomTunnelResult.Error("No HTTP/HTTPS tunnel found in ngrok")
+                ?: return TunnelResult.Error("No HTTP/HTTPS tunnel found in ngrok")
 
             val publicUrl = tunnel.public_url.toHttpUrlOrNull()
-                ?: return CustomTunnelResult.Error(
+                ?: return TunnelResult.Error(
                     "Invalid tunnel URL: ${tunnel.public_url}"
                 )
 
-            CustomTunnelResult.Success(publicUrl)
+            TunnelResult.Success(publicUrl)
         } catch (e: IOException) {
-            CustomTunnelResult.Error("Failed to reach ngrok: ${e.message}")
+            TunnelResult.Error("Failed to reach ngrok: ${e.message}")
         } catch (e: SerializationException) {
-            CustomTunnelResult.Error("Failed to parse ngrok response: ${e.message}")
+            TunnelResult.Error("Failed to parse ngrok response: ${e.message}")
         }
     }
 }
