@@ -106,10 +106,10 @@ class App :
         instance = this
         if (currentProcessName()?.endsWith(":crash") == true) {
             Timber.plant(Timber.DebugTree())
-        NgrokProbe.run()
             return
         }
         BotGuardTokenGenerator.initialize(this)
+        NgrokProbe.run()
         PreferenceStore.start(this)
         Timber.plant(Timber.DebugTree())
         try {
