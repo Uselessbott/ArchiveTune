@@ -49,6 +49,7 @@ import moe.rukamori.archivetune.paxsenix.PaxsenixLyrics
 import moe.rukamori.archivetune.scrobbling.LastFmServiceConfig
 import moe.rukamori.archivetune.storage.StorageFolderKind
 import moe.rukamori.archivetune.storage.StorageLocationRepository
+import moe.rukamori.archivetune.together.ngrok.NgrokProbe
 import moe.rukamori.archivetune.ui.player.CanvasArtworkPlaybackCache
 import moe.rukamori.archivetune.ui.screens.settings.ThemePalettes
 import moe.rukamori.archivetune.ui.theme.ThemeSeedPalette
@@ -105,6 +106,7 @@ class App :
         instance = this
         if (currentProcessName()?.endsWith(":crash") == true) {
             Timber.plant(Timber.DebugTree())
+        NgrokProbe.run()
             return
         }
         BotGuardTokenGenerator.initialize(this)
