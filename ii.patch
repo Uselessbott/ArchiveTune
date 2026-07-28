@@ -1,0 +1,31 @@
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -82,22 +82,22 @@
+         localProperties.getProperty("START_IO_APP_ID")
+             ?: System.getenv("START_IO_APP_ID")
+             ?: ""
+         ).trim()
+-/*                                     /*
++/*
+ tasks.register<ValidateStartIoReleaseConfigurationTask>("validateStartIoReleaseConfiguration") {
+     group = "verification"
+     description = "Validates the production Start.io identifier for GMS release artifacts."
+     appId.set(startIoAppId)
+ }
+-*/
+-
+-/*
++
+ tasks.configureEach {
+     val isGmsReleaseArtifactTask =
+         (name.startsWith("assemble") || name.startsWith("bundle")) &&
+             name.contains("Gms") &&
+             name.endsWith("Release")
+     if (isGmsReleaseArtifactTask) {
+         dependsOn("validateStartIoReleaseConfiguration")
+-    */
++    }
++}
++*/
+
+ android {
