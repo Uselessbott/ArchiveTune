@@ -290,6 +290,8 @@ import kotlin.math.sin
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.ensureActive
+import moe.rukamori.archivetune.together.TogetherOnlineApi
+import moe.rukamori.archivetune.together.TogetherOnlineHost
 
 
 private sealed interface TogetherConnectionState {
