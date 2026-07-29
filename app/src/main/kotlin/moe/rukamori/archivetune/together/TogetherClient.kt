@@ -38,13 +38,13 @@ import java.util.concurrent.TimeUnit
 sealed interface TogetherClientEvent {
     data class Welcome(val welcome: ServerWelcome) : TogetherClientEvent
     data class RoomState(val state: TogetherRoomState) : TogetherClientEvent
-    data class JoinDecision(val decision: JoinDecision) : TogetherClientEvent
-    data class HostTransferred(val transfer: HostTransferred) : TogetherClientEvent
+    data class JoinDecision(val decision: moe.rukamori.archivetune.together.JoinDecision) : TogetherClientEvent
+    data class HostTransferred(val transfer: moe.rukamori.archivetune.together.HostTransferred) : TogetherClientEvent
     data class ControlRequested(val request: ControlRequest) : TogetherClientEvent
     data class AddTrackRequested(val request: AddTrackRequest) : TogetherClientEvent
     data class ServerIssue(val message: String, val code: String? = null) : TogetherClientEvent
     data class Error(val message: String, val throwable: Throwable? = null) : TogetherClientEvent
-    data class HeartbeatPong(val pong: HeartbeatPong, val receivedAtElapsedRealtimeMs: Long) : TogetherClientEvent
+    data class HeartbeatPong(val pong: moe.rukamori.archivetune.together.HeartbeatPong, val receivedAtElapsedRealtimeMs: Long) : TogetherClientEvent
     data object Disconnected : TogetherClientEvent
 }
 
