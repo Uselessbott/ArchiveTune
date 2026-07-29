@@ -744,6 +744,14 @@ class MusicService :
     private var storedWsUrl: String? = null
     private var storedHostDisplayName: String? = null
     private var storedHostSettings: TogetherRoomSettings? = null
+    private var storedSessionId: String? = null
+    private var storedHostKey: String? = null
+    private var storedBearerToken: String? = null
+    private var storedClientId: String? = null
+
+    private val _connectionState =
+        MutableStateFlow<TogetherConnectionState>(TogetherConnectionState.Idle)
+    val connectionState: StateFlow<TogetherConnectionState> = _connectionState
     private var storedJoinInfo: TogetherJoinInfo? = null
     private var storedJoinDisplayName: String? = null
     private var storedOnlineCode: String? = null
