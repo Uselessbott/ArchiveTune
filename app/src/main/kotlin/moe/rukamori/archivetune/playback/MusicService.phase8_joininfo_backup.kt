@@ -103,9 +103,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
@@ -4160,14 +4158,19 @@ class MusicService :
                 java.util.UUID
                     .randomUUID()
                     .toString()
-                        val joinInfo =
+            val joinInfo =
+
+        if (joinInfo != null) {
+            storedJoinInfo = joinInfo
+            storedJoinDisplayName = displayName
+            storedUseWebRtc = useWebRtc
+        }
                 moe.rukamori.archivetune.together.TogetherJoinInfo(
                     host = localIp ?: "127.0.0.1",
                     port = port,
                     sessionId = sessionId,
                     sessionKey = sessionKey,
                 )
-
             storedJoinInfo = joinInfo
             storedJoinDisplayName = displayName
             storedUseWebRtc = useWebRtc
