@@ -4341,7 +4341,6 @@ class MusicService :
                                     state == WebRtcConnectionState.CLOSED
                                 }
                         }
-                        else -> null
                     }
                 }
                 if (finalState == WebRtcConnectionState.CONNECTED) {
