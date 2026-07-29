@@ -744,8 +744,7 @@ private fun HostControlsCard(
 
         ToggleRow(
             iconResId = R.drawable.link,
-            title = "Use WebRTC (Experimental)",
-            subtitle = "Direct peer-to-peer transport when available",
+            titleResId = R.string.together_online,
             checked = host.useWebRtc,
             onCheckedChange = viewModel::setUseWebRtc,
         )

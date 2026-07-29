@@ -68,6 +68,10 @@ class UpdateMusicTogetherPreferencesUseCase
         suspend fun setWelcomeShown(value: Boolean) {
             repository.setWelcomeShown(value)
         }
+
+        suspend fun setUseWebRtc(value: Boolean) {
+            repository.setUseWebRtc(value)
+        }
     }
 
 class MusicTogetherSessionActionsUseCase
