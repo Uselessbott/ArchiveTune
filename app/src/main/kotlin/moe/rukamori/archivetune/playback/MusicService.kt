@@ -239,6 +239,12 @@ import moe.rukamori.archivetune.scrobbling.LastFmServiceConfig
 import moe.rukamori.archivetune.storage.StorageFolderKind
 import moe.rukamori.archivetune.storage.StorageLocationRepository
 import moe.rukamori.archivetune.together.TogetherPlaybackSync
+import moe.rukamori.archivetune.together.TogetherJoinInfo
+import moe.rukamori.archivetune.together.TogetherRoomSettings
+import moe.rukamori.archivetune.together.TogetherSessionState
+import moe.rukamori.archivetune.together.TogetherJoinInfo
+import moe.rukamori.archivetune.together.TogetherRoomSettings
+import moe.rukamori.archivetune.together.TogetherSessionState
 import moe.rukamori.archivetune.ui.screens.settings.DiscordPresenceManager
 import moe.rukamori.archivetune.ui.screens.settings.ListenBrainzManager
 import moe.rukamori.archivetune.utils.AuthScopedCacheValue
@@ -4280,7 +4286,7 @@ class MusicService :
         }
 
         while (reconnectAttempts < maxAttempts) {
-            ensureActive()
+            coroutineContext.ensureActive()
             reconnectAttempts++
             val delayMs = (baseDelayMs * (1L shl (reconnectAttempts - 1))).coerceAtMost(maxDelayMs)
             val actualDelay = if (reconnectAttempts == 1) 0L else delayMs
@@ -4289,7 +4295,7 @@ class MusicService :
                 delay(actualDelay)
             }
 
-            ensureActive()
+            coroutineContext.ensureActive()
             if (manualDisconnectRequested) {
                 Timber.d("Reconnect cancelled: manual disconnect requested")
                 return
@@ -4301,7 +4307,7 @@ class MusicService :
                     when {
                         isHost -> {
                             val displayName = storedHostDisplayName!!
-                            val settings = storedHostSettings!!
+                            val settings = storedHostSettings ?: return@withTimeoutOrNull null
                             Timber.d("Attempting host reconnection")
                             startTogetherOnlineHost(displayName, settings, storedUseWebRtc)
                             // Wait for a state change from the current state
@@ -4314,10 +4320,10 @@ class MusicService :
                                 }
                         }
                         isLanGuest -> {
-                            val joinInfo = storedJoinInfo!!
+                            val joinInfo = storedJoinInfo ?: return@withTimeoutOrNull null
                             val displayName = storedJoinDisplayName!!
                             Timber.d("Attempting LAN guest reconnection")
-                            val link = joinInfo.toDeepLink()
+                            val link = moe.rukamori.archivetune.together.TogetherLink.encode(joinInfo)
                             joinTogether(link, displayName, storedUseWebRtc)
                             webRtcTransport.webRtcConnectionState
                                 .dropWhile { it == currentState }
