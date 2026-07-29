@@ -22,21 +22,6 @@ import org.webrtc.SessionDescription
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Represents the overall connection state of the WebRTC transport.
- */
-enum class WebRtcConnectionState {
-    IDLE, CONNECTING, CONNECTED, DISCONNECTED, CLOSED
-}
-
-/**
- * Reason for connection failure.
- * Emitted ONLY from ICE state changes (single source of truth).
- */
-enum class ConnectionFailureReason {
-    ICE_DISCONNECTED, ICE_FAILED
-}
-
 @Singleton
 class WebRtcTransport @Inject constructor(
     private val peerFactory: WebRtcPeerFactory
@@ -52,20 +37,12 @@ class WebRtcTransport @Inject constructor(
     private val _connectionState = MutableStateFlow<DataChannel.State?>(null)
     val connectionState: StateFlow<DataChannel.State?> = _connectionState.asStateFlow()
 
-    private val _webRtcConnectionState = MutableStateFlow<WebRtcConnectionState>(WebRtcConnectionState.IDLE)
-    val webRtcConnectionState: StateFlow<WebRtcConnectionState> = _webRtcConnectionState.asStateFlow()
-
-    private val _connectionFailure = MutableSharedFlow<ConnectionFailureReason>(extraBufferCapacity = 64)
-    val connectionFailure: SharedFlow<ConnectionFailureReason> = _connectionFailure
-
     // Messages
     private val _receivedMessages = MutableSharedFlow<TogetherMessage>(extraBufferCapacity = 64)
     val receivedMessages: SharedFlow<TogetherMessage> = _receivedMessages
 
     private var peerStateJob: kotlinx.coroutines.Job? = null
     private var peerMessageJob: kotlinx.coroutines.Job? = null
-    private var wasConnected = false
-    private var manualDisconnect = false
 
     fun host(listener: (status: String) -> Unit = {}) {
         disconnect()
@@ -80,16 +57,13 @@ class WebRtcTransport @Inject constructor(
     }
 
     fun disconnect() {
-        manualDisconnect = true
         peerStateJob?.cancel()
         peerStateJob = null
         peerMessageJob?.cancel()
         peerMessageJob = null
         currentPeer?.close()
         currentPeer = null
-        wasConnected = false
         scope.coroutineContext.cancelChildren()
-        _webRtcConnectionState.value = WebRtcConnectionState.CLOSED
     }
 
     suspend fun createOffer(): SessionDescription {
@@ -155,32 +129,7 @@ class WebRtcTransport @Inject constructor(
             }
 
             override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
-                // SINGLE SOURCE OF TRUTH for connection failure events.
-                // Only ICE state changes can trigger a failure emission.
-                when (state) {
-                    PeerConnection.IceConnectionState.CONNECTED,
-                    PeerConnection.IceConnectionState.COMPLETED -> {
-                        // ICE is connected - we don't need to do anything here
-                        // The DataChannel will transition to OPEN and set CONNECTED
-                    }
-                    PeerConnection.IceConnectionState.DISCONNECTED -> {
-                        if (!manualDisconnect && wasConnected &&
-                            _webRtcConnectionState.value == WebRtcConnectionState.CONNECTED
-                        ) {
-                            _webRtcConnectionState.value = WebRtcConnectionState.DISCONNECTED
-                            _connectionFailure.tryEmit(ConnectionFailureReason.ICE_DISCONNECTED)
-                        }
-                    }
-                    PeerConnection.IceConnectionState.FAILED -> {
-                        if (!manualDisconnect && wasConnected &&
-                            _webRtcConnectionState.value == WebRtcConnectionState.CONNECTED
-                        ) {
-                            _webRtcConnectionState.value = WebRtcConnectionState.DISCONNECTED
-                            _connectionFailure.tryEmit(ConnectionFailureReason.ICE_FAILED)
-                        }
-                    }
-                    else -> { /* ignore */ }
-                }
+                // Not needed yet
             }
 
             override fun onIceConnectionReceivingChange(receiving: Boolean) {
@@ -225,25 +174,10 @@ class WebRtcTransport @Inject constructor(
             peer.createDataChannel()
         }
 
-        // Reset manualDisconnect and set CONNECTING after peer is fully initialized
-        manualDisconnect = false
-        _webRtcConnectionState.value = WebRtcConnectionState.CONNECTING
-
         // Forward state and messages from peer to transport flows
         peerStateJob = peer.connectionState
             .onEach { state ->
                 _connectionState.value = state
-                when (state) {
-                    DataChannel.State.OPEN -> {
-                        _webRtcConnectionState.value = WebRtcConnectionState.CONNECTED
-                        wasConnected = true
-                    }
-                    DataChannel.State.CONNECTING -> {
-                        _webRtcConnectionState.value = WebRtcConnectionState.CONNECTING
-                    }
-                    // DataChannel closing does NOT set DISCONNECTED - ICE handles that
-                    else -> { /* ignore */ }
-                }
             }
             .launchIn(scope)
 
