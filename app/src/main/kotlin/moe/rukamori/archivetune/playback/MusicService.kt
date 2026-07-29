@@ -4170,7 +4170,6 @@ class MusicService :
 
             storedJoinInfo = joinInfo
             storedJoinDisplayName = displayName
-            storedUseWebRtc = useWebRtc
 
             val joinLink =
                 moe.rukamori.archivetune.together.TogetherLink
@@ -4475,7 +4474,6 @@ class MusicService :
             storedWsUrl = wsUrl
             storedHostDisplayName = displayName
             storedHostSettings = settings
-            storedUseWebRtc = useWebRtc
                 moe.rukamori.archivetune.together.TogetherOnlineEndpoint.onlineWebSocketUrlOrNull(
                     rawWsUrl = created.wsUrl,
                     baseUrl = baseUrl,
@@ -4835,7 +4833,6 @@ class MusicService :
 
             storedOnlineCode = trimmedCode
             storedOnlineDisplayName = displayName
-            storedUseWebRtc = useWebRtc
                 runCatching { api.resolveCode(trimmedCode) }
                     .getOrElse { t ->
                         scope.launch(SilentHandler) {
