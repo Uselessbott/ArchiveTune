@@ -4171,10 +4171,6 @@ class MusicService :
                     sessionId = sessionId,
                     sessionKey = sessionKey,
                 )
-            storedJoinInfo = joinInfo
-            storedJoinDisplayName = displayName
-            storedUseWebRtc = useWebRtc
-
             val joinLink =
                 moe.rukamori.archivetune.together.TogetherLink
                     .encode(joinInfo)
@@ -4555,13 +4551,13 @@ class MusicService :
     }
 
     fun joinTogether(
+
+        manualDisconnectRequested = false
+        reconnectAttempts = 0
         rawLink: String,
         displayName: String,
         useWebRtc: Boolean = false,
-    ) {
-        manualDisconnectRequested = false
-        reconnectAttempts = 0
-
+) {
         ensureScopesActive()
         val joinInfo =
             moe.rukamori.archivetune.together.TogetherLink
