@@ -718,6 +718,7 @@ class MusicService :
         webRtcTransport.webRtcConnectionState
 
     val connectionFailure: SharedFlow<ConnectionFailureReason> =
+        webRtcTransport.connectionFailure
 
     // Phase 8C: Reconnection state
     private val reconnectMutex = Mutex()
@@ -732,7 +733,6 @@ class MusicService :
     private var storedOnlineCode: String? = null
     private var storedOnlineDisplayName: String? = null
     private var storedUseWebRtc: Boolean = false
-        webRtcTransport.connectionFailure
     private var togetherServer: moe.rukamori.archivetune.together.TogetherServer? = null
     private var togetherOnlineHost: moe.rukamori.archivetune.together.TogetherOnlineHost? = null
     private var togetherClient: moe.rukamori.archivetune.together.TogetherClient? = null
@@ -4367,13 +4367,13 @@ class MusicService :
     }
 
     fun startTogetherOnlineHost(
-
-        manualDisconnectRequested = false
-        reconnectAttempts = 0
         displayName: String,
         settings: moe.rukamori.archivetune.together.TogetherRoomSettings,
         useWebRtc: Boolean = false,
-) {
+    ) {
+        manualDisconnectRequested = false
+        reconnectAttempts = 0
+
         ensureScopesActive()
         scope.launch(SilentHandler) {
             togetherSessionState.value = moe.rukamori.archivetune.together.TogetherSessionState.Idle
@@ -4772,13 +4772,13 @@ class MusicService :
     }
 
     fun joinTogetherOnline(
-
-        manualDisconnectRequested = false
-        reconnectAttempts = 0
         code: String,
         displayName: String,
         useWebRtc: Boolean = false,
-) {
+    ) {
+        manualDisconnectRequested = false
+        reconnectAttempts = 0
+
         ensureScopesActive()
         val trimmedCode = code.trim()
         if (trimmedCode.isBlank()) {
