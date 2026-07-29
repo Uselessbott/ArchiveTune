@@ -80,12 +80,14 @@ class MusicTogetherSessionActionsUseCase
             displayName: String,
             port: Int,
             settings: TogetherRoomSettings,
+            useWebRtc: Boolean = false,
         ) {
             repository.startSession(
                 mode = mode,
                 displayName = displayName,
                 port = port,
                 settings = settings,
+                useWebRtc = useWebRtc,
             )
         }
 
@@ -93,11 +95,13 @@ class MusicTogetherSessionActionsUseCase
             mode: MusicTogetherConnectionMode,
             rawInput: String,
             displayName: String,
+            useWebRtc: Boolean = false,
         ) {
             repository.joinSession(
                 mode = mode,
                 rawInput = rawInput,
                 displayName = displayName,
+                useWebRtc = useWebRtc,
             )
         }
 

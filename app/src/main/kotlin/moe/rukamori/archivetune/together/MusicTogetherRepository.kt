@@ -26,6 +26,7 @@ import moe.rukamori.archivetune.constants.TogetherDisplayNameKey
 import moe.rukamori.archivetune.constants.TogetherLastJoinLinkKey
 import moe.rukamori.archivetune.constants.TogetherRequireHostApprovalToJoinKey
 import moe.rukamori.archivetune.constants.TogetherWelcomeShownKey
+import moe.rukamori.archivetune.constants.TogetherUseWebRtcKey
 import moe.rukamori.archivetune.playback.MusicService
 import moe.rukamori.archivetune.utils.dataStore
 import javax.inject.Inject
@@ -45,6 +46,7 @@ data class MusicTogetherPreferences(
     val requireHostApprovalToJoin: Boolean,
     val lastJoinLink: String,
     val welcomeShown: Boolean,
+    val useWebRtc: Boolean,
 )
 
 data class MusicTogetherSnapshot(
@@ -74,6 +76,7 @@ class MusicTogetherRepository
                         requireHostApprovalToJoin = preferences[TogetherRequireHostApprovalToJoinKey] ?: false,
                         lastJoinLink = preferences[TogetherLastJoinLinkKey] ?: "",
                         welcomeShown = preferences[TogetherWelcomeShownKey] ?: false,
+                        useWebRtc = preferences[TogetherUseWebRtcKey] ?: false,
                     )
                 }.distinctUntilChanged()
 
@@ -129,11 +132,19 @@ class MusicTogetherRepository
             }
         }
 
+
+        suspend fun setUseWebRtc(value: Boolean) {
+            context.dataStore.edit { preferences ->
+                preferences[TogetherUseWebRtcKey] = value
+            }
+        }
+
         fun startSession(
             mode: MusicTogetherConnectionMode,
             displayName: String,
             port: Int,
             settings: TogetherRoomSettings,
+            useWebRtc: Boolean = false,
         ) {
             val service = serviceFlow.value ?: return
             when (mode) {
@@ -149,6 +160,7 @@ class MusicTogetherRepository
                     service.startTogetherOnlineHost(
                         displayName = displayName,
                         settings = settings,
+                        useWebRtc = useWebRtc,
                     )
                 }
 
@@ -166,11 +178,17 @@ class MusicTogetherRepository
             mode: MusicTogetherConnectionMode,
             rawInput: String,
             displayName: String,
+            useWebRtc: Boolean = false,
         ) {
             val service = serviceFlow.value ?: return
             when (mode) {
                 MusicTogetherConnectionMode.LAN -> service.joinTogether(rawInput, displayName)
-                MusicTogetherConnectionMode.ONLINE -> service.joinTogetherOnline(rawInput, displayName)
+                MusicTogetherConnectionMode.ONLINE ->
+                    service.joinTogetherOnline(
+                        rawInput,
+                        displayName,
+                        useWebRtc,
+                    )
                 MusicTogetherConnectionMode.CUSTOM -> service.joinTogetherCustom(rawInput, displayName)
             }
         }
