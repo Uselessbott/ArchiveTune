@@ -291,6 +291,15 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.ensureActive
 
+
+private sealed interface TogetherConnectionState {
+    data object Idle : TogetherConnectionState
+    data object Connecting : TogetherConnectionState
+    data object Connected : TogetherConnectionState
+    data class Reconnecting(val attempt: Int) : TogetherConnectionState
+    data class Failed(val message: String) : TogetherConnectionState
+}
+
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class, UnstableApi::class)
 @AndroidEntryPoint
 class MusicService :
@@ -982,12 +991,6 @@ class MusicService :
                     .setOnlyAlertOnce(true)
                     .build()
             } catch (e: Exception) {
-
-                if (isPermanentFailure(e)) {
-                    Timber.w("Permanent failure, stopping retry")
-                    _connectionState.value = TogetherConnectionState.Failed(e.message ?: "Permanent error")
-                    break
-                }
                 reportException(e)
                 return
             }

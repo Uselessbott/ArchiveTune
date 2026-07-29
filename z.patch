@@ -1,0 +1,15 @@
+@@
+-            } catch (e: Exception) {
+-
+-                if (isPermanentFailure(e)) {
+-                    Timber.w("Permanent failure, stopping retry")
+-                    _connectionState.value = TogetherConnectionState.Failed(e.message ?: "Permanent error")
+-                    break
+-                }
+-                reportException(e)
+-                return
+-            }
++            } catch (e: Exception) {
++                reportException(e)
++                return
++            }
