@@ -148,6 +148,7 @@ data class MusicTogetherHostUiModel(
     val allowGuestsToAddTracks: Boolean,
     val allowGuestsToControlPlayback: Boolean,
     val requireHostApprovalToJoin: Boolean,
+    val useWebRtc: Boolean,
     val visible: Boolean,
     val startEnabled: Boolean,
     val loading: Boolean,
@@ -156,6 +157,7 @@ data class MusicTogetherHostUiModel(
 @Immutable
 data class MusicTogetherJoinUiModel(
     val onlineMode: Boolean,
+    val useWebRtc: Boolean,
     val input: String,
     @StringRes val hintResId: Int,
     val canJoin: Boolean,
@@ -433,6 +435,14 @@ class MusicTogetherViewModel
             pushSettingsToActiveSession(approval = value)
         }
 
+
+        fun setUseWebRtc(value: Boolean) {
+            viewModelScope.launch(Dispatchers.IO) {
+                updatePreferences.setUseWebRtc(value)
+            }
+        }
+
+
         fun startSession() {
             val model = successModel() ?: return
             if (!model.host.startEnabled) return
@@ -632,6 +642,7 @@ class MusicTogetherViewModel
                     allowGuestsToAddTracks = preferences.allowGuestsToAddTracks,
                     allowGuestsToControlPlayback = preferences.allowGuestsToControlPlayback,
                     requireHostApprovalToJoin = preferences.requireHostApprovalToJoin,
+                    useWebRtc = preferences.useWebRtc,
                     visible = !isJoinedAsGuest,
                     startEnabled = !isCreatingSessionLoading && !isJoining && !isHosting && state !is TogetherSessionState.Joined,
                     loading = isCreatingSessionLoading,
@@ -646,6 +657,7 @@ class MusicTogetherViewModel
             val join =
                 MusicTogetherJoinUiModel(
                     onlineMode = joinOnline,
+                    useWebRtc = preferences.useWebRtc,
                     input = joinInput,
                     hintResId = if (joinOnline) R.string.together_join_code_hint else R.string.together_join_link_hint,
                     canJoin = canJoin && !disableJoinUi && !isJoining && !isJoinedAsAcceptedGuest && !isWaitingApproval,

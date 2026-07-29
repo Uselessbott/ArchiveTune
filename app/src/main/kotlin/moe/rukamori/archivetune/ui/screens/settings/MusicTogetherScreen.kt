@@ -740,6 +740,16 @@ private fun HostControlsCard(
             checked = host.requireHostApprovalToJoin,
             onCheckedChange = viewModel::setRequireHostApprovalToJoin,
         )
+
+
+        ToggleRow(
+            iconResId = R.drawable.link,
+            title = "Use WebRTC (Experimental)",
+            subtitle = "Direct peer-to-peer transport when available",
+            checked = host.useWebRtc,
+            onCheckedChange = viewModel::setUseWebRtc,
+        )
+
         Button(
             enabled = host.startEnabled,
             onClick = viewModel::startSession,
