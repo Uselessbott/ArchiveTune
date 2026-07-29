@@ -28,80 +28,41 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import moe.rukamori.archivetune.together.webrtc.WebRtcTransport
+import org.webrtc.DataChannel
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 sealed interface TogetherClientEvent {
-    data class Welcome(
-        val welcome: ServerWelcome,
-    ) : TogetherClientEvent
-
-    data class RoomState(
-        val state: TogetherRoomState,
-    ) : TogetherClientEvent
-
-    data class JoinDecision(
-        val decision: moe.rukamori.archivetune.together.JoinDecision,
-    ) : TogetherClientEvent
-
-    data class HostTransferred(
-        val transfer: moe.rukamori.archivetune.together.HostTransferred,
-    ) : TogetherClientEvent
-
-    data class ControlRequested(
-        val request: ControlRequest,
-    ) : TogetherClientEvent
-
-    data class AddTrackRequested(
-        val request: AddTrackRequest,
-    ) : TogetherClientEvent
-
-    data class ServerIssue(
-        val message: String,
-        val code: String? = null,
-    ) : TogetherClientEvent
-
-    data class Error(
-        val message: String,
-        val throwable: Throwable? = null,
-    ) : TogetherClientEvent
-
-    data class HeartbeatPong(
-        val pong: moe.rukamori.archivetune.together.HeartbeatPong,
-        val receivedAtElapsedRealtimeMs: Long,
-    ) : TogetherClientEvent
-
+    data class Welcome(val welcome: ServerWelcome) : TogetherClientEvent
+    data class RoomState(val state: TogetherRoomState) : TogetherClientEvent
+    data class JoinDecision(val decision: JoinDecision) : TogetherClientEvent
+    data class HostTransferred(val transfer: HostTransferred) : TogetherClientEvent
+    data class ControlRequested(val request: ControlRequest) : TogetherClientEvent
+    data class AddTrackRequested(val request: AddTrackRequest) : TogetherClientEvent
+    data class ServerIssue(val message: String, val code: String? = null) : TogetherClientEvent
+    data class Error(val message: String, val throwable: Throwable? = null) : TogetherClientEvent
+    data class HeartbeatPong(val pong: HeartbeatPong, val receivedAtElapsedRealtimeMs: Long) : TogetherClientEvent
     data object Disconnected : TogetherClientEvent
 }
 
 @Immutable
 sealed class TogetherClientState {
     data object Idle : TogetherClientState()
-
-    data class Connecting(
-        val joinInfo: TogetherJoinInfo,
-    ) : TogetherClientState()
-
-    data class Connected(
-        val session: TogetherJoinInfo,
-    ) : TogetherClientState()
-
-    data class ConnectingRemote(
-        val wsUrl: String,
-        val sessionId: String,
-    ) : TogetherClientState()
-
-    data class ConnectedRemote(
-        val wsUrl: String,
-        val sessionId: String,
-    ) : TogetherClientState()
+    data class Connecting(val joinInfo: TogetherJoinInfo) : TogetherClientState()
+    data class Connected(val session: TogetherJoinInfo) : TogetherClientState()
+    data class ConnectingRemote(val wsUrl: String, val sessionId: String) : TogetherClientState()
+    data class ConnectedRemote(val wsUrl: String, val sessionId: String) : TogetherClientState()
 }
 
 class TogetherClient(
     private val externalScope: CoroutineScope,
     clientId: String = UUID.randomUUID().toString(),
     private val bearerToken: String? = null,
+    private val webRtcTransport: WebRtcTransport? = null,
+    private val useWebRtc: Boolean = false,
 ) {
     private val client =
         HttpClient(OkHttp) {
@@ -129,9 +90,82 @@ class TogetherClient(
 
     private var session: WebSocketSession? = null
     private var loopJob: Job? = null
+    private var webRtcReceiveJob: Job? = null
     private var selfParticipantId: String? = null
     private val clientId = clientId.trim().ifBlank { UUID.randomUUID().toString() }.take(64)
     private val normalizedBearerToken: String? = bearerToken?.trim()?.takeIf { it.isNotBlank() }
+
+    // ---------- Shared send ----------
+    private suspend fun sendMessage(message: TogetherMessage) {
+        if (useWebRtc) {
+            webRtcTransport?.sendMessage(message)
+        } else {
+            session?.send(TogetherJson.json.encodeToString(TogetherMessage.serializer(), message))
+        }
+    }
+
+    // ---------- Shared message processing ----------
+    private suspend fun processIncomingMessage(message: TogetherMessage) {
+        when (message) {
+            is ServerWelcome -> {
+                if (message.sessionId == sessionId ?: return) {
+                    selfParticipantId = message.participantId
+                    _events.tryEmit(TogetherClientEvent.Welcome(message))
+                }
+            }
+            is RoomStateMessage -> {
+                if (message.state.sessionId == sessionId ?: return) {
+                    _events.tryEmit(TogetherClientEvent.RoomState(message.state))
+                }
+            }
+            is JoinDecision -> {
+                if (message.sessionId == sessionId && message.participantId == selfParticipantId) {
+                    _events.tryEmit(TogetherClientEvent.JoinDecision(message))
+                }
+            }
+            is HostTransferred -> {
+                if (message.sessionId == sessionId) {
+                    _events.tryEmit(TogetherClientEvent.HostTransferred(message))
+                }
+            }
+            is KickParticipant -> {
+                if (message.sessionId == sessionId && message.participantId == selfParticipantId) {
+                    val detail = message.reason?.trim().orEmpty().ifBlank { "Kicked" }
+                    _events.tryEmit(TogetherClientEvent.Error(detail, null))
+                }
+            }
+            is BanParticipant -> {
+                if (message.sessionId == sessionId && message.participantId == selfParticipantId) {
+                    val detail = message.reason?.trim().orEmpty().ifBlank { "Banned" }
+                    _events.tryEmit(TogetherClientEvent.Error(detail, null))
+                }
+            }
+            is HeartbeatPong -> {
+                if (message.sessionId == sessionId) {
+                    _events.tryEmit(
+                        TogetherClientEvent.HeartbeatPong(
+                            pong = message,
+                            receivedAtElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime(),
+                        )
+                    )
+                }
+            }
+            is ControlRequest -> {
+                if (message.sessionId == sessionId) {
+                    _events.tryEmit(TogetherClientEvent.ControlRequested(message))
+                }
+            }
+            is AddTrackRequest -> {
+                if (message.sessionId == sessionId) {
+                    _events.tryEmit(TogetherClientEvent.AddTrackRequested(message))
+                }
+            }
+            is ServerError -> {
+                _events.tryEmit(TogetherClientEvent.ServerIssue(message = message.message, code = message.code))
+            }
+            else -> { /* ignore */ }
+        }
+    }
 
     fun connect(
         joinInfo: TogetherJoinInfo,
@@ -140,6 +174,35 @@ class TogetherClient(
         scope.launch {
             disconnect()
             _state.value = TogetherClientState.Connecting(joinInfo)
+
+            if (useWebRtc) {
+                webRtcTransport?.join()
+                // Start listening to incoming messages
+                webRtcReceiveJob = scope.launch {
+                    webRtcTransport?.receivedMessages?.collect { message ->
+                        processIncomingMessage(message)
+                    }
+                }
+                // After DataChannel opens, send ClientHello
+                scope.launch {
+                    try {
+                        webRtcTransport?.connectionState?.first { it == DataChannel.State.OPEN }
+                        val hello =
+                            ClientHello(
+                                protocolVersion = TogetherProtocolVersion,
+                                sessionId = joinInfo.sessionId,
+                                sessionKey = joinInfo.sessionKey,
+                                clientId = clientId,
+                                displayName = displayName.trim(),
+                            )
+                        sendMessage(hello)
+                        _state.value = TogetherClientState.Connected(joinInfo)
+                    } catch (_: Exception) {
+                        // Connection closed or timeout
+                    }
+                }
+                return@launch
+            }
 
             val wsUrl = joinInfo.toWebSocketUrl()
             val urls = listOfNotNull(wsUrl, alternateWebSocketSchemeOrNull(wsUrl)).distinct()
@@ -164,7 +227,7 @@ class TogetherClient(
                                 clientId = clientId,
                                 displayName = displayName.trim(),
                             )
-                        send(TogetherJson.json.encodeToString(TogetherMessage.serializer(), hello))
+                        sendMessage(hello)
                         _state.value = TogetherClientState.Connected(joinInfo)
                         runLoop(this, joinInfo.sessionId)
                     }
@@ -189,6 +252,33 @@ class TogetherClient(
             disconnect()
             _state.value = TogetherClientState.ConnectingRemote(wsUrl = wsUrl, sessionId = sessionId)
 
+            if (useWebRtc) {
+                webRtcTransport?.join()
+                webRtcReceiveJob = scope.launch {
+                    webRtcTransport?.receivedMessages?.collect { message ->
+                        processIncomingMessage(message)
+                    }
+                }
+                scope.launch {
+                    try {
+                        webRtcTransport?.connectionState?.first { it == DataChannel.State.OPEN }
+                        val hello =
+                            ClientHello(
+                                protocolVersion = TogetherProtocolVersion,
+                                sessionId = sessionId,
+                                sessionKey = sessionKey,
+                                clientId = clientId,
+                                displayName = displayName.trim().ifBlank { "Guest" },
+                            )
+                        sendMessage(hello)
+                        _state.value = TogetherClientState.ConnectedRemote(wsUrl = wsUrl, sessionId = sessionId)
+                    } catch (_: Exception) {
+                        // Connection closed or timeout
+                    }
+                }
+                return@launch
+            }
+
             val urls = listOfNotNull(wsUrl.trim(), alternateWebSocketSchemeOrNull(wsUrl.trim())).distinct()
 
             val token = normalizedBearerToken
@@ -211,7 +301,7 @@ class TogetherClient(
                                 clientId = clientId,
                                 displayName = displayName.trim().ifBlank { "Guest" },
                             )
-                        send(TogetherJson.json.encodeToString(TogetherMessage.serializer(), hello))
+                        sendMessage(hello)
                         _state.value = TogetherClientState.ConnectedRemote(wsUrl = candidate, sessionId = sessionId)
                         runLoop(this, sessionId)
                     }
@@ -240,22 +330,10 @@ class TogetherClient(
         val raw = root?.message?.trim().orEmpty()
         val reason =
             when (root) {
-                is java.net.UnknownHostException -> {
-                    "Server not found"
-                }
-
-                is java.net.ConnectException -> {
-                    "Connection refused"
-                }
-
-                is java.net.SocketTimeoutException -> {
-                    "Connection timed out"
-                }
-
-                is javax.net.ssl.SSLHandshakeException -> {
-                    "Secure connection failed"
-                }
-
+                is java.net.UnknownHostException -> "Server not found"
+                is java.net.ConnectException -> "Connection refused"
+                is java.net.SocketTimeoutException -> "Connection timed out"
+                is javax.net.ssl.SSLHandshakeException -> "Secure connection failed"
                 is IllegalArgumentException -> {
                     if (raw.contains("ws", ignoreCase = true) &&
                         raw.contains("scheme", ignoreCase = true)
@@ -265,17 +343,16 @@ class TogetherClient(
                         null
                     }
                 }
-
-                else -> {
-                    null
-                }
+                else -> null
             }
-
         val detail = reason ?: raw.takeIf { it.isNotBlank() }
         return if (detail == null) "Connection failed" else "Connection failed: $detail"
     }
 
     suspend fun disconnect() {
+        webRtcReceiveJob?.cancel()
+        webRtcReceiveJob = null
+        webRtcTransport?.disconnect()
         loopJob?.cancel()
         loopJob?.cancelAndJoin()
         loopJob = null
@@ -291,12 +368,7 @@ class TogetherClient(
     ) {
         val pid = selfParticipantId ?: return
         scope.launch {
-            session?.send(
-                TogetherJson.json.encodeToString(
-                    TogetherMessage.serializer(),
-                    ControlRequest(sessionId = sessionId, participantId = pid, action = action),
-                ),
-            )
+            sendMessage(ControlRequest(sessionId = sessionId, participantId = pid, action = action))
         }
     }
 
@@ -307,23 +379,13 @@ class TogetherClient(
     ) {
         val pid = selfParticipantId ?: return
         scope.launch {
-            session?.send(
-                TogetherJson.json.encodeToString(
-                    TogetherMessage.serializer(),
-                    AddTrackRequest(sessionId = sessionId, participantId = pid, track = track, mode = mode),
-                ),
-            )
+            sendMessage(AddTrackRequest(sessionId = sessionId, participantId = pid, track = track, mode = mode))
         }
     }
 
     fun sendRoomState(state: TogetherRoomState) {
         scope.launch {
-            session?.send(
-                TogetherJson.json.encodeToString(
-                    TogetherMessage.serializer(),
-                    RoomStateMessage(state),
-                ),
-            )
+            sendMessage(RoomStateMessage(state))
         }
     }
 
@@ -332,12 +394,7 @@ class TogetherClient(
         participantId: String,
     ) {
         scope.launch {
-            session?.send(
-                TogetherJson.json.encodeToString(
-                    TogetherMessage.serializer(),
-                    HostTransfer(sessionId = sessionId, participantId = participantId),
-                ),
-            )
+            sendMessage(HostTransfer(sessionId = sessionId, participantId = participantId))
         }
     }
 
@@ -347,19 +404,17 @@ class TogetherClient(
         clientElapsedRealtimeMs: Long,
     ) {
         scope.launch {
-            session?.send(
-                TogetherJson.json.encodeToString(
-                    TogetherMessage.serializer(),
-                    HeartbeatPing(
-                        sessionId = sessionId,
-                        pingId = pingId,
-                        clientElapsedRealtimeMs = clientElapsedRealtimeMs,
-                    ),
-                ),
+            sendMessage(
+                HeartbeatPing(
+                    sessionId = sessionId,
+                    pingId = pingId,
+                    clientElapsedRealtimeMs = clientElapsedRealtimeMs,
+                )
             )
         }
     }
 
+    // ---------- WebSocket loop ----------
     private suspend fun runLoop(
         session: WebSocketSession,
         sessionId: String,
@@ -382,88 +437,7 @@ class TogetherClient(
                                     _events.tryEmit(TogetherClientEvent.Error("Failed to decode message", it))
                                     continue
                                 }
-
-                        when (message) {
-                            is ServerWelcome -> {
-                                if (message.sessionId == sessionId) {
-                                    selfParticipantId = message.participantId
-                                    _events.tryEmit(TogetherClientEvent.Welcome(message))
-                                }
-                            }
-
-                            is RoomStateMessage -> {
-                                if (message.state.sessionId == sessionId) {
-                                    _events.tryEmit(TogetherClientEvent.RoomState(message.state))
-                                }
-                            }
-
-                            is moe.rukamori.archivetune.together.JoinDecision -> {
-                                if (message.sessionId == sessionId && message.participantId == selfParticipantId) {
-                                    _events.tryEmit(TogetherClientEvent.JoinDecision(message))
-                                }
-                            }
-
-                            is moe.rukamori.archivetune.together.HostTransferred -> {
-                                if (message.sessionId == sessionId) {
-                                    _events.tryEmit(TogetherClientEvent.HostTransferred(message))
-                                }
-                            }
-
-                            is KickParticipant -> {
-                                if (message.sessionId == sessionId && message.participantId == selfParticipantId) {
-                                    val detail =
-                                        message.reason
-                                            ?.trim()
-                                            .orEmpty()
-                                            .ifBlank { "Kicked" }
-                                    _events.tryEmit(TogetherClientEvent.Error(detail, null))
-                                    break
-                                }
-                            }
-
-                            is BanParticipant -> {
-                                if (message.sessionId == sessionId && message.participantId == selfParticipantId) {
-                                    val detail =
-                                        message.reason
-                                            ?.trim()
-                                            .orEmpty()
-                                            .ifBlank { "Banned" }
-                                    _events.tryEmit(TogetherClientEvent.Error(detail, null))
-                                    break
-                                }
-                            }
-
-                            is HeartbeatPong -> {
-                                if (message.sessionId == sessionId) {
-                                    _events.tryEmit(
-                                        TogetherClientEvent.HeartbeatPong(
-                                            pong = message,
-                                            receivedAtElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime(),
-                                        ),
-                                    )
-                                }
-                            }
-
-                            is ControlRequest -> {
-                                if (message.sessionId == sessionId) {
-                                    _events.tryEmit(TogetherClientEvent.ControlRequested(message))
-                                }
-                            }
-
-                            is AddTrackRequest -> {
-                                if (message.sessionId == sessionId) {
-                                    _events.tryEmit(TogetherClientEvent.AddTrackRequested(message))
-                                }
-                            }
-
-                            is ServerError -> {
-                                _events.tryEmit(TogetherClientEvent.ServerIssue(message = message.message, code = message.code))
-                            }
-
-                            else -> {
-                                Unit
-                            }
-                        }
+                        processIncomingMessage(message)
                     }
                 } catch (t: Throwable) {
                     _events.tryEmit(TogetherClientEvent.Error("Connection loop failed", t))
@@ -474,4 +448,11 @@ class TogetherClient(
             }
         loopJob?.join()
     }
+
+    private val sessionId: String?
+        get() = when (val s = _state.value) {
+            is TogetherClientState.Connected -> s.session.sessionId
+            is TogetherClientState.ConnectedRemote -> s.sessionId
+            else -> null
+        }
 }

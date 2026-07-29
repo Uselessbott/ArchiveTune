@@ -4202,8 +4202,7 @@ class MusicService :
     fun startTogetherOnlineHost(
         displayName: String,
         settings: moe.rukamori.archivetune.together.TogetherRoomSettings,
-        useWebRtc: Boolean = false,
-) {
+    ) {
         ensureScopesActive()
         scope.launch(SilentHandler) {
             togetherSessionState.value = moe.rukamori.archivetune.together.TogetherSessionState.Idle
@@ -4275,8 +4274,6 @@ class MusicService :
                     initialSettings = created.settings,
                     clientId = getOrCreateTogetherClientId(),
                     bearerToken = togetherToken,
-                    webRtcTransport = webRtcTransport,
-                    useWebRtc = useWebRtc,
                 )
 
             onlineHost.onEvent = { event ->
@@ -4382,8 +4379,7 @@ class MusicService :
     fun joinTogether(
         rawLink: String,
         displayName: String,
-        useWebRtc: Boolean = false,
-) {
+    ) {
         ensureScopesActive()
         val joinInfo =
             moe.rukamori.archivetune.together.TogetherLink
@@ -4412,8 +4408,6 @@ class MusicService :
                 moe.rukamori.archivetune.together.TogetherClient(
                     ioScope,
                     clientId = getOrCreateTogetherClientId(),
-                    webRtcTransport = webRtcTransport,
-                    useWebRtc = useWebRtc,
                 )
             togetherClient = client
             togetherClock =
@@ -4596,8 +4590,7 @@ class MusicService :
     fun joinTogetherOnline(
         code: String,
         displayName: String,
-        useWebRtc: Boolean = false,
-) {
+    ) {
         ensureScopesActive()
         val trimmedCode = code.trim()
         if (trimmedCode.isBlank()) {
