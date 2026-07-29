@@ -751,7 +751,7 @@ class MusicService :
 
     private val _connectionState =
         MutableStateFlow<TogetherConnectionState>(TogetherConnectionState.Idle)
-    val connectionState: StateFlow<TogetherConnectionState> = _connectionState
+    private val connectionState: StateFlow<TogetherConnectionState> = _connectionState
     private var storedJoinInfo: TogetherJoinInfo? = null
     private var storedJoinDisplayName: String? = null
     private var storedOnlineCode: String? = null

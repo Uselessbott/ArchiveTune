@@ -5,8 +5,8 @@ import sys
 path = Path("app/src/main/kotlin/moe/rukamori/archivetune/playback/MusicService.kt")
 text = path.read_text(encoding="utf-8")
 
-old = "private sealed interface TogetherConnectionState"
-new = "internal sealed interface TogetherConnectionState"
+old = "    val connectionState: StateFlow<TogetherConnectionState> = _connectionState"
+new = "    private val connectionState: StateFlow<TogetherConnectionState> = _connectionState"
 
 if new in text:
     print("Already patched.")
@@ -19,4 +19,4 @@ if old not in text:
 text = text.replace(old, new, 1)
 path.write_text(text, encoding="utf-8")
 
-print("✓ TogetherConnectionState is now internal.")
+print("✓ connectionState made private.")
