@@ -294,7 +294,7 @@ import moe.rukamori.archivetune.together.TogetherOnlineApi
 import moe.rukamori.archivetune.together.TogetherOnlineHost
 
 
-private sealed interface TogetherConnectionState {
+internal sealed interface TogetherConnectionState {
     data object Idle : TogetherConnectionState
     data object Connecting : TogetherConnectionState
     data object Connected : TogetherConnectionState
