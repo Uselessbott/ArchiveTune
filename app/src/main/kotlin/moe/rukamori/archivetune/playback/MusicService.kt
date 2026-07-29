@@ -4283,7 +4283,6 @@ class MusicService :
         }
 
         while (reconnectAttempts < maxAttempts) {
-            yield()
             reconnectAttempts++
             val delayMs = (baseDelayMs * (1L shl (reconnectAttempts - 1))).coerceAtMost(maxDelayMs)
             val actualDelay = if (reconnectAttempts == 1) 0L else delayMs
@@ -4292,7 +4291,6 @@ class MusicService :
                 delay(actualDelay)
             }
 
-            yield()
             if (manualDisconnectRequested) {
                 Timber.d("Reconnect cancelled: manual disconnect requested")
                 return
@@ -4414,11 +4412,7 @@ class MusicService :
             val api =
                 moe.rukamori.archivetune.together
                     .TogetherOnlineApi(baseUrl = baseUrl, bearerToken = togetherToken)
-                )
 
-            storedWsUrl = wsUrl
-            storedHostDisplayName = displayName
-            storedHostSettings = settings
             val hostName = displayName.trim().ifBlank { getString(R.string.app_name) }
 
             val created =
@@ -4483,10 +4477,6 @@ class MusicService :
                     rawWsUrl = created.wsUrl,
                     baseUrl = baseUrl,
                 )
-
-            storedWsUrl = wsUrl
-            storedHostDisplayName = displayName
-            storedHostSettings = settings
                 )
             if (wsUrl == null) {
                 scope.launch(SilentHandler) {
@@ -4842,11 +4832,7 @@ class MusicService :
             val api =
                 moe.rukamori.archivetune.together
                     .TogetherOnlineApi(baseUrl = baseUrl, bearerToken = togetherToken)
-                )
 
-            storedWsUrl = wsUrl
-            storedHostDisplayName = displayName
-            storedHostSettings = settings
             val resolved =
 
                 runCatching { api.resolveCode(trimmedCode) }
@@ -5050,10 +5036,6 @@ class MusicService :
                     rawWsUrl = resolved.wsUrl,
                     baseUrl = baseUrl,
                 )
-
-            storedWsUrl = wsUrl
-            storedHostDisplayName = displayName
-            storedHostSettings = settings
                 )
             if (wsUrl == null) {
                 scope.launch(SilentHandler) {
