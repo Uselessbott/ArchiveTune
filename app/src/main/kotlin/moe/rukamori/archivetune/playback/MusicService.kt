@@ -4581,8 +4581,6 @@ class MusicService :
         ioScope.launch(SilentHandler) {
             stopTogetherInternal()
             togetherIsOnlineSession = false
-            storedOnlineCode = trimmedCode
-            storedOnlineDisplayName = displayName
 
             val client =
                 moe.rukamori.archivetune.together.TogetherClient(
@@ -5117,8 +5115,6 @@ class MusicService :
         if (targetId.isBlank() || targetId == togetherHostId || targetId == togetherSelfParticipantId) return
         val server = togetherServer
         val onlineHost = togetherOnlineHost
-            storedOnlineCode = trimmedCode
-            storedOnlineDisplayName = displayName
 
         val client = togetherClient
         val joined = togetherSessionState.value as? moe.rukamori.archivetune.together.TogetherSessionState.Joined
@@ -5140,8 +5136,6 @@ class MusicService :
     }
 
     fun requestTogetherControl(action: moe.rukamori.archivetune.together.ControlAction) {
-            storedOnlineCode = trimmedCode
-            storedOnlineDisplayName = displayName
 
         val client =
             togetherClient ?: run {
@@ -5201,8 +5195,6 @@ class MusicService :
         track: moe.rukamori.archivetune.together.TogetherTrack,
         mode: moe.rukamori.archivetune.together.AddTrackMode,
     ) {
-            storedOnlineCode = trimmedCode
-            storedOnlineDisplayName = displayName
 
         val client = togetherClient ?: return
         val state = togetherSessionState.value as? moe.rukamori.archivetune.together.TogetherSessionState.Joined ?: return
@@ -5528,8 +5520,6 @@ class MusicService :
     private fun handleTogetherClientHostTransferred(transfer: moe.rukamori.archivetune.together.HostTransferred) {
         val participantId = transfer.participantId
         handleTogetherHostTransferred(participantId)
-            storedOnlineCode = trimmedCode
-            storedOnlineDisplayName = displayName
 
         val client = togetherClient ?: return
         if (participantId != togetherSelfParticipantId) return
