@@ -110,6 +110,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
@@ -253,6 +254,9 @@ import moe.rukamori.archivetune.utils.isLowDataModeActive
 import moe.rukamori.archivetune.utils.reportException
 import moe.rukamori.archivetune.utils.retryWithoutPlaybackLoginContext
 import moe.rukamori.archivetune.widget.LoadWidgetInsightsUseCase
+import moe.rukamori.archivetune.together.webrtc.WebRtcTransport
+import moe.rukamori.archivetune.together.webrtc.WebRtcConnectionState
+import moe.rukamori.archivetune.together.webrtc.ConnectionFailureReason
 import okhttp3.OkHttpClient
 import timber.log.Timber
 import java.io.EOFException
@@ -706,6 +710,13 @@ class MusicService :
         MutableStateFlow<moe.rukamori.archivetune.together.TogetherSessionState>(
             moe.rukamori.archivetune.together.TogetherSessionState.Idle,
         )
+
+    // Phase 8B: Expose transport state and failure events directly (no duplication)
+    val transportState: StateFlow<WebRtcConnectionState> =
+        webRtcTransport.webRtcConnectionState
+
+    val connectionFailure: SharedFlow<ConnectionFailureReason> =
+        webRtcTransport.connectionFailure
     private var togetherServer: moe.rukamori.archivetune.together.TogetherServer? = null
     private var togetherOnlineHost: moe.rukamori.archivetune.together.TogetherOnlineHost? = null
     private var togetherClient: moe.rukamori.archivetune.together.TogetherClient? = null
@@ -1339,6 +1350,18 @@ class MusicService :
                 networkConnectivity = connectivityObserver,
                 lyricsHelper = lyricsHelper,
             )
+
+        // Phase 8B: Log transport state changes and failures
+        scope.launch {
+            webRtcTransport.webRtcConnectionState.collect { state ->
+                Timber.d("Transport state: $state")
+            }
+        }
+        scope.launch {
+            webRtcTransport.connectionFailure.collect { reason ->
+                Timber.w("Connection failure: $reason")
+            }
+        }
 
         dataStore.data
             .map(::readEqSettingsFromPrefs)
@@ -4202,7 +4225,8 @@ class MusicService :
     fun startTogetherOnlineHost(
         displayName: String,
         settings: moe.rukamori.archivetune.together.TogetherRoomSettings,
-    ) {
+        useWebRtc: Boolean = false,
+) {
         ensureScopesActive()
         scope.launch(SilentHandler) {
             togetherSessionState.value = moe.rukamori.archivetune.together.TogetherSessionState.Idle
@@ -4274,6 +4298,8 @@ class MusicService :
                     initialSettings = created.settings,
                     clientId = getOrCreateTogetherClientId(),
                     bearerToken = togetherToken,
+                    webRtcTransport = webRtcTransport,
+                    useWebRtc = useWebRtc,
                 )
 
             onlineHost.onEvent = { event ->
@@ -4379,7 +4405,8 @@ class MusicService :
     fun joinTogether(
         rawLink: String,
         displayName: String,
-    ) {
+        useWebRtc: Boolean = false,
+) {
         ensureScopesActive()
         val joinInfo =
             moe.rukamori.archivetune.together.TogetherLink
@@ -4408,6 +4435,8 @@ class MusicService :
                 moe.rukamori.archivetune.together.TogetherClient(
                     ioScope,
                     clientId = getOrCreateTogetherClientId(),
+                    webRtcTransport = webRtcTransport,
+                    useWebRtc = useWebRtc,
                 )
             togetherClient = client
             togetherClock =
@@ -4590,7 +4619,8 @@ class MusicService :
     fun joinTogetherOnline(
         code: String,
         displayName: String,
-    ) {
+        useWebRtc: Boolean = false,
+) {
         ensureScopesActive()
         val trimmedCode = code.trim()
         if (trimmedCode.isBlank()) {
