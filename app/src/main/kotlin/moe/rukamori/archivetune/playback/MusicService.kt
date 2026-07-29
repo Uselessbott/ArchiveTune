@@ -730,11 +730,13 @@ class MusicService :
         )
 
     // Phase 8B: Expose transport state and failure events directly (no duplication)
-    val transportState: StateFlow<WebRtcConnectionState> =
+    val transportState: StateFlow<WebRtcConnectionState> by lazy {
         webRtcTransport.webRtcConnectionState
+    }
 
-    val connectionFailure: SharedFlow<ConnectionFailureReason> =
+    val connectionFailure: SharedFlow<ConnectionFailureReason> by lazy {
         webRtcTransport.connectionFailure
+    }
 
     // Phase 8C: Reconnection state
     private val reconnectMutex = Mutex()
