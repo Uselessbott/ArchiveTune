@@ -738,6 +738,8 @@ class MusicService :
     private var storedOnlineCode: String? = null
     private var storedOnlineDisplayName: String? = null
     private var storedUseWebRtc: Boolean = false
+
+    private var isReconnecting = false
     private var togetherServer: moe.rukamori.archivetune.together.TogetherServer? = null
     private var togetherOnlineHost: moe.rukamori.archivetune.together.TogetherOnlineHost? = null
     private var togetherClient: moe.rukamori.archivetune.together.TogetherClient? = null
@@ -980,6 +982,12 @@ class MusicService :
                     .setOnlyAlertOnce(true)
                     .build()
             } catch (e: Exception) {
+
+                if (isPermanentFailure(e)) {
+                    Timber.w("Permanent failure, stopping retry")
+                    _connectionState.value = TogetherConnectionState.Failed(e.message ?: "Permanent error")
+                    break
+                }
                 reportException(e)
                 return
             }
@@ -1377,6 +1385,7 @@ class MusicService :
             webRtcTransport.webRtcConnectionState.collect { state ->
                 Timber.d("Transport state: $state")
                 if (state == WebRtcConnectionState.CONNECTED) {
+                        _connectionState.value = TogetherConnectionState.Connected
                     reconnectAttempts = 0
                     if (manualDisconnectRequested) {
                         manualDisconnectRequested = false
@@ -4256,10 +4265,31 @@ class MusicService :
         }
     }
 
+
+    // Phase 9: Classify errors as transient or permanent
+    private fun isPermanentFailure(t: Throwable): Boolean {
+        return when (t) {
+            is moe.rukamori.archivetune.together.TogetherOnlineApiException -> {
+                when (t.statusCode) {
+                    401, 403, 404 -> true
+                    else -> false
+                }
+            }
+            is java.net.UnknownHostException -> false
+            is java.net.ConnectException -> false
+            is java.net.SocketTimeoutException -> false
+            is javax.net.ssl.SSLHandshakeException -> false
+            else -> false
+        }
+    }
+
+
     // Phase 8C: Reconnection orchestration
     private fun startReconnect() {
         if (reconnectJob?.isActive == true) return
         if (manualDisconnectRequested) return
+        isReconnecting = true
+        _connectionState.value = TogetherConnectionState.Reconnecting(reconnectAttempts + 1)
         reconnectJob = ioScope.launch(SilentHandler) {
             reconnectMutex.withLock {
                 performReconnect()
@@ -4301,10 +4331,45 @@ class MusicService :
                 val finalState = withTimeoutOrNull(attemptTimeoutMs) {
                     when {
                         isHost -> {
+                            val wsUrl = storedWsUrl!!
                             val displayName = storedHostDisplayName!!
                             val settings = storedHostSettings ?: return@withTimeoutOrNull null
-                            Timber.d("Attempting host reconnection")
-                            startTogetherOnlineHost(displayName, settings, storedUseWebRtc)
+                            val sessionId = storedSessionId ?: return@withTimeoutOrNull null
+                            val hostKey = storedHostKey ?: return@withTimeoutOrNull null
+                            val bearerToken = storedBearerToken ?: return@withTimeoutOrNull null
+                            val clientId = storedClientId ?: return@withTimeoutOrNull null
+                            Timber.d("Attempting host reconnection to existing session $sessionId")
+                            // Recreate host from stored parameters to avoid creating a new session
+                            val newHost = TogetherOnlineHost(
+                                externalScope = ioScope,
+                                sessionId = sessionId,
+                                sessionKey = hostKey,
+                                hostId = togetherHostId,
+                                hostDisplayName = displayName,
+                                initialSettings = settings,
+                                clientId = clientId,
+                                bearerToken = bearerToken,
+                                webRtcTransport = webRtcTransport,
+                                useWebRtc = storedUseWebRtc
+                            )
+                            newHost.onEvent = { event ->
+                                ioScope.launch(SilentHandler) {
+                                    handleTogetherHostEvent(event) { newHost.currentSettings() }
+                                }
+                            }
+                            togetherOnlineHost = newHost
+                            // Recreate the API to schedule inactivity timeout
+                            val api = TogetherOnlineApi(
+                                baseUrl = moe.rukamori.archivetune.together.TogetherOnlineEndpoint.baseUrlOrNull(dataStore) ?: return@withTimeoutOrNull null,
+                                bearerToken = bearerToken
+                            )
+                            scheduleTogetherHostInactivityTimeout(sessionId) {
+                                api.endSession(
+                                    sessionId = sessionId,
+                                    hostKey = hostKey,
+                                )
+                            }
+                            newHost.connect(wsUrl)
                             // Wait for a state change from the current state
                             return@withTimeoutOrNull webRtcTransport.webRtcConnectionState
                                 .dropWhile { it == currentState }
@@ -4346,6 +4411,7 @@ class MusicService :
                 }
                 if (finalState == WebRtcConnectionState.CONNECTED) {
                     Timber.d("Reconnection successful")
+                    isReconnecting = false
                     return
                 } else {
                     Timber.w("Reconnection attempt did not reach CONNECTED, state: $finalState")
@@ -4356,6 +4422,8 @@ class MusicService :
         }
 
         Timber.w("Reconnection attempts exhausted")
+        isReconnecting = false
+        _connectionState.value = TogetherConnectionState.Failed("Reconnection attempts exhausted")
         scope.launch(SilentHandler) {
             togetherSessionState.value = TogetherSessionState.Error(
                 message = "Reconnection failed after $maxAttempts attempts",
@@ -4371,6 +4439,9 @@ class MusicService :
     ) {
         manualDisconnectRequested = false
         reconnectAttempts = 0
+        _connectionState.value = TogetherConnectionState.Connecting
+        _connectionState.value = TogetherConnectionState.Connecting
+        _connectionState.value = TogetherConnectionState.Connecting
 
         ensureScopesActive()
         scope.launch(SilentHandler) {
@@ -5056,6 +5127,7 @@ class MusicService :
     }
 
     fun leaveTogether() {
+        _connectionState.value = TogetherConnectionState.Idle
         ensureScopesActive()
         manualDisconnectRequested = true
         reconnectJob?.cancel()
@@ -5136,6 +5208,10 @@ class MusicService :
     }
 
     fun requestTogetherControl(action: moe.rukamori.archivetune.together.ControlAction) {
+        if (isReconnecting) {
+            showTogetherNotice("Reconnecting, please wait", key = "RECONNECT_IN_PROGRESS")
+            return
+        }
 
         val client =
             togetherClient ?: run {
@@ -5195,6 +5271,10 @@ class MusicService :
         track: moe.rukamori.archivetune.together.TogetherTrack,
         mode: moe.rukamori.archivetune.together.AddTrackMode,
     ) {
+        if (isReconnecting) {
+            showTogetherNotice("Reconnecting, please wait", key = "RECONNECT_IN_PROGRESS")
+            return
+        }
 
         val client = togetherClient ?: return
         val state = togetherSessionState.value as? moe.rukamori.archivetune.together.TogetherSessionState.Joined ?: return
