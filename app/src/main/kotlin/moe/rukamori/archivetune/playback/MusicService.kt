@@ -242,9 +242,6 @@ import moe.rukamori.archivetune.together.TogetherPlaybackSync
 import moe.rukamori.archivetune.together.TogetherJoinInfo
 import moe.rukamori.archivetune.together.TogetherRoomSettings
 import moe.rukamori.archivetune.together.TogetherSessionState
-import moe.rukamori.archivetune.together.TogetherJoinInfo
-import moe.rukamori.archivetune.together.TogetherRoomSettings
-import moe.rukamori.archivetune.together.TogetherSessionState
 import moe.rukamori.archivetune.ui.screens.settings.DiscordPresenceManager
 import moe.rukamori.archivetune.ui.screens.settings.ListenBrainzManager
 import moe.rukamori.archivetune.utils.AuthScopedCacheValue
@@ -4286,7 +4283,7 @@ class MusicService :
         }
 
         while (reconnectAttempts < maxAttempts) {
-            coroutineContext.ensureActive()
+            yield()
             reconnectAttempts++
             val delayMs = (baseDelayMs * (1L shl (reconnectAttempts - 1))).coerceAtMost(maxDelayMs)
             val actualDelay = if (reconnectAttempts == 1) 0L else delayMs
@@ -4295,7 +4292,7 @@ class MusicService :
                 delay(actualDelay)
             }
 
-            coroutineContext.ensureActive()
+            yield()
             if (manualDisconnectRequested) {
                 Timber.d("Reconnect cancelled: manual disconnect requested")
                 return
@@ -4417,6 +4414,11 @@ class MusicService :
             val api =
                 moe.rukamori.archivetune.together
                     .TogetherOnlineApi(baseUrl = baseUrl, bearerToken = togetherToken)
+                )
+
+            storedWsUrl = wsUrl
+            storedHostDisplayName = displayName
+            storedHostSettings = settings
             val hostName = displayName.trim().ifBlank { getString(R.string.app_name) }
 
             val created =
@@ -4477,12 +4479,14 @@ class MusicService :
 
             val wsUrl =
 
-            storedWsUrl = wsUrl
-            storedHostDisplayName = displayName
-            storedHostSettings = settings
                 moe.rukamori.archivetune.together.TogetherOnlineEndpoint.onlineWebSocketUrlOrNull(
                     rawWsUrl = created.wsUrl,
                     baseUrl = baseUrl,
+                )
+
+            storedWsUrl = wsUrl
+            storedHostDisplayName = displayName
+            storedHostSettings = settings
                 )
             if (wsUrl == null) {
                 scope.launch(SilentHandler) {
@@ -4587,6 +4591,9 @@ class MusicService :
         ioScope.launch(SilentHandler) {
             stopTogetherInternal()
             togetherIsOnlineSession = false
+            storedOnlineCode = trimmedCode
+            storedOnlineDisplayName = displayName
+
             val client =
                 moe.rukamori.archivetune.together.TogetherClient(
                     ioScope,
@@ -4835,10 +4842,13 @@ class MusicService :
             val api =
                 moe.rukamori.archivetune.together
                     .TogetherOnlineApi(baseUrl = baseUrl, bearerToken = togetherToken)
+                )
+
+            storedWsUrl = wsUrl
+            storedHostDisplayName = displayName
+            storedHostSettings = settings
             val resolved =
 
-            storedOnlineCode = trimmedCode
-            storedOnlineDisplayName = displayName
                 runCatching { api.resolveCode(trimmedCode) }
                     .getOrElse { t ->
                         scope.launch(SilentHandler) {
@@ -4851,6 +4861,9 @@ class MusicService :
                         reportException(t)
                         return@launch
                     }
+
+            storedOnlineCode = trimmedCode
+            storedOnlineDisplayName = displayName
 
             val client =
                 moe.rukamori.archivetune.together.TogetherClient(
@@ -5037,6 +5050,11 @@ class MusicService :
                     rawWsUrl = resolved.wsUrl,
                     baseUrl = baseUrl,
                 )
+
+            storedWsUrl = wsUrl
+            storedHostDisplayName = displayName
+            storedHostSettings = settings
+                )
             if (wsUrl == null) {
                 scope.launch(SilentHandler) {
                     togetherSessionState.value =
@@ -5118,6 +5136,9 @@ class MusicService :
         if (targetId.isBlank() || targetId == togetherHostId || targetId == togetherSelfParticipantId) return
         val server = togetherServer
         val onlineHost = togetherOnlineHost
+            storedOnlineCode = trimmedCode
+            storedOnlineDisplayName = displayName
+
         val client = togetherClient
         val joined = togetherSessionState.value as? moe.rukamori.archivetune.together.TogetherSessionState.Joined
         ioScope.launch(SilentHandler) {
@@ -5138,6 +5159,9 @@ class MusicService :
     }
 
     fun requestTogetherControl(action: moe.rukamori.archivetune.together.ControlAction) {
+            storedOnlineCode = trimmedCode
+            storedOnlineDisplayName = displayName
+
         val client =
             togetherClient ?: run {
                 showTogetherNotice(getString(R.string.network_unavailable), key = "TOGETHER_CLIENT_MISSING")
@@ -5196,6 +5220,9 @@ class MusicService :
         track: moe.rukamori.archivetune.together.TogetherTrack,
         mode: moe.rukamori.archivetune.together.AddTrackMode,
     ) {
+            storedOnlineCode = trimmedCode
+            storedOnlineDisplayName = displayName
+
         val client = togetherClient ?: return
         val state = togetherSessionState.value as? moe.rukamori.archivetune.together.TogetherSessionState.Joined ?: return
         if (state.role !is moe.rukamori.archivetune.together.TogetherRole.Guest) return
@@ -5520,6 +5547,9 @@ class MusicService :
     private fun handleTogetherClientHostTransferred(transfer: moe.rukamori.archivetune.together.HostTransferred) {
         val participantId = transfer.participantId
         handleTogetherHostTransferred(participantId)
+            storedOnlineCode = trimmedCode
+            storedOnlineDisplayName = displayName
+
         val client = togetherClient ?: return
         if (participantId != togetherSelfParticipantId) return
         startTogetherAuthorityBroadcast(transfer.sessionId, participantId, client)
