@@ -4472,12 +4472,9 @@ class MusicService :
             }
 
             val wsUrl =
-
                 moe.rukamori.archivetune.together.TogetherOnlineEndpoint.onlineWebSocketUrlOrNull(
                     rawWsUrl = created.wsUrl,
                     baseUrl = baseUrl,
-                )
-                )
             if (wsUrl == null) {
                 scope.launch(SilentHandler) {
                     togetherSessionState.value =
@@ -4834,7 +4831,6 @@ class MusicService :
                     .TogetherOnlineApi(baseUrl = baseUrl, bearerToken = togetherToken)
 
             val resolved =
-
                 runCatching { api.resolveCode(trimmedCode) }
                     .getOrElse { t ->
                         scope.launch(SilentHandler) {
@@ -5035,8 +5031,6 @@ class MusicService :
                 moe.rukamori.archivetune.together.TogetherOnlineEndpoint.onlineWebSocketUrlOrNull(
                     rawWsUrl = resolved.wsUrl,
                     baseUrl = baseUrl,
-                )
-                )
             if (wsUrl == null) {
                 scope.launch(SilentHandler) {
                     togetherSessionState.value =
