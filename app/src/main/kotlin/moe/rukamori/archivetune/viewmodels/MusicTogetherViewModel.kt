@@ -269,6 +269,7 @@ class MusicTogetherViewModel
                                     requireHostApprovalToJoin = false,
                                     lastJoinLink = "",
                                     welcomeShown = false,
+                                    useWebRtc = false,
                                 ),
                             sessionState = TogetherSessionState.Error(message = throwable.message.orEmpty()),
                         ),
