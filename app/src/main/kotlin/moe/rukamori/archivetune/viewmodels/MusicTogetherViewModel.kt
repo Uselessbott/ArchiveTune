@@ -559,18 +559,12 @@ class MusicTogetherViewModel
 
                     else -> false
 
-        is HostingManualWebRtc -> Unit
-        is JoiningManualWebRtc -> Unit
-}
             val isCreatingSessionLoading =
                 when (state) {
                     is TogetherSessionState.Hosting -> state.roomState == null
                     is TogetherSessionState.HostingOnline -> state.roomState == null
                     else -> false
 
-        is HostingManualWebRtc -> Unit
-        is JoiningManualWebRtc -> Unit
-}
             val isJoinedAsGuest = state is TogetherSessionState.Joined && state.role is TogetherRole.Guest
             val isWaitingApproval =
                 state is TogetherSessionState.Joined &&
