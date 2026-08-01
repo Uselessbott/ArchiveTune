@@ -4,6 +4,15 @@ import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+
+import kotlinx.coroutines.Job
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import moe.rukamori.archivetune.together.webrtc.WebRtcTransport
 import kotlinx.serialization.decodeFromString
@@ -11,6 +20,8 @@ import kotlinx.serialization.encodeToString
 import moe.rukamori.archivetune.together.ManualQrProtocol
 import moe.rukamori.archivetune.together.TogetherJson
 import org.webrtc.SessionDescription
+import kotlinx.coroutines.flow.collectLatest
+import moe.rukamori.archivetune.together.webrtc.WebRtcConnectionState
 
 
 class QrWebRtcSession(
@@ -27,6 +38,12 @@ class QrWebRtcSession(
 
     private var remoteSessionId: String? = null
 
+
+    private var iceCollectionJob: Job? = null
+    private var connectionObserverJob: Job? = null
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val pendingIceCandidates = mutableListOf<ManualIceCandidate>()
     private val iceMutex = Mutex()
 
@@ -37,9 +54,72 @@ class QrWebRtcSession(
     val exchangeState: StateFlow<QrExchangeState> =
         _exchangeState.asStateFlow()
 
+
+
+    
+    private fun observeConnectionState() {
+        connectionObserverJob?.cancel()
+
+        connectionObserverJob = scope.launch {
+            transport.webRtcConnectionState.collectLatest { state ->
+                when (state) {
+                    WebRtcConnectionState.CONNECTING -> {
+                        _exchangeState.value = QrExchangeState.Connecting
+                    }
+
+                    WebRtcConnectionState.CONNECTED -> {
+                        _exchangeState.value = QrExchangeState.Connected
+                    }
+
+                    WebRtcConnectionState.DISCONNECTED -> {
+                        _exchangeState.value =
+                            QrExchangeState.Failed("Peer disconnected")
+                    }
+
+                    WebRtcConnectionState.CLOSED -> {
+                        if (_exchangeState.value != QrExchangeState.Idle) {
+                            _exchangeState.value = QrExchangeState.Idle
+                        }
+                    }
+
+                    WebRtcConnectionState.IDLE -> Unit
+                }
+            }
+        }
+    }
+
+private fun startIceCollection()
+        observeConnectionState() {
+        iceCollectionJob?.cancel()
+        connectionObserverJob?.cancel()
+
+        iceCollectionJob = scope.launch {
+            transport.localIceCandidates.collect { dto ->
+                iceMutex.lock()
+                try {
+                    pendingIceCandidates += ManualIceCandidate(
+                        version = ManualQrProtocol.VERSION,
+                        sessionId = sessionId,
+                        candidate = dto,
+                    )
+
+
+                flushIceCandidates()
+                continue
+
+                } finally {
+                    iceMutex.unlock()
+                }
+            }
+        }
+    }
+
+
     suspend fun startHost() {
         _exchangeState.value = QrExchangeState.CreatingOffer
         transport.host()
+        startIceCollection()
+        observeConnectionState()
         val offerSdp = transport.createOffer()
         transport.setLocalDescription(offerSdp)
 
@@ -65,6 +145,8 @@ class QrWebRtcSession(
 
     suspend fun startGuest() {
         _exchangeState.value = QrExchangeState.WaitingForOffer
+        transport.join()
+        startIceCollection()
     }
 
     suspend fun submitPackets(packets: List<String>) {
@@ -94,8 +176,20 @@ class QrWebRtcSession(
                 handleAnswer(answer)
             }
             QrSignalKind.ICE -> {
-                // Phase 3
-                TODO("Phase 3: ICE batching")
+                val batch =
+                    TogetherJson.json.decodeFromString<ManualIceCandidateBatch>(
+                        signalPacket.payload
+                    )
+
+                batch.candidates.forEach { dto ->
+                    handleIce(
+                        ManualIceCandidate(
+                            version = batch.version,
+                            sessionId = batch.sessionId,
+                            candidate = dto,
+                        )
+                    )
+                }
             }
         }
     }
@@ -155,17 +249,52 @@ class QrWebRtcSession(
         _exchangeState.value = QrExchangeState.Connecting
     }
 
+
+    private suspend fun flushIceCandidates() {
+        iceMutex.lock()
+        try {
+            if (pendingIceCandidates.isEmpty()) return
+
+            val batch = ManualIceCandidateBatch(
+                version = ManualQrProtocol.VERSION,
+                sessionId = sessionId,
+                candidates = pendingIceCandidates.map { it.candidate }
+            )
+
+            val json = TogetherJson.json.encodeToString(batch)
+
+            val packet = QrSignalPacket(
+                version = ManualQrProtocol.VERSION,
+                sessionId = sessionId,
+                kind = QrSignalKind.ICE,
+                part = REASSEMBLED_PART,
+                total = ManualQrProtocol.QR_COUNT,
+                payload = json,
+            )
+
+            _qrPackets.value = QrCodec.encode(packet)
+
+            pendingIceCandidates.clear()
+
+        } finally {
+            iceMutex.unlock()
+        }
+    }
+
+
     suspend fun handleIce(
         candidate: ManualIceCandidate,
     ) {
-        // Phase 3: ICE batching
-        TODO("Phase 3: ICE batching")
+        transport.addRemoteIceCandidate(candidate.candidate)
     }
 
     fun close() {
         transport.disconnect()
         _exchangeState.value = QrExchangeState.Idle
         _qrPackets.value = emptyList()
+        iceCollectionJob?.cancel()
+        connectionObserverJob?.cancel()
+        scope.cancel()
         pendingIceCandidates.clear()
         remoteSessionId = null
     }
