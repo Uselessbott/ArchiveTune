@@ -101,7 +101,6 @@ class QrWebRtcSession(
             "offer" -> SessionDescription.Type.OFFER
             "answer" -> SessionDescription.Type.ANSWER
             "pranswer" -> SessionDescription.Type.PRANSWER
-            "rollback" -> SessionDescription.Type.ROLLBACK
             else -> error("Unknown SDP type: $type")
         }
     }
@@ -111,7 +110,6 @@ class QrWebRtcSession(
             SessionDescription.Type.OFFER -> "offer"
             SessionDescription.Type.ANSWER -> "answer"
             SessionDescription.Type.PRANSWER -> "pranswer"
-            SessionDescription.Type.ROLLBACK -> "rollback"
             else -> error("Unknown SDP type: $type")
         }
 
