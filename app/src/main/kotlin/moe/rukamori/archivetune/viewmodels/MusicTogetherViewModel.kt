@@ -588,12 +588,14 @@ class MusicTogetherViewModel
 
                             is TogetherSessionState.Hosting,
                             is TogetherSessionState.HostingOnline,
+                            is TogetherSessionState.HostingManualWebRtc,
                             -> {
                                 R.string.together_hosting
                             }
 
                             is TogetherSessionState.Joining,
                             is TogetherSessionState.JoiningOnline,
+                            TogetherSessionState.JoiningManualWebRtc,
                             -> {
                                 R.string.together_joining
                             }
@@ -898,13 +900,15 @@ class MusicTogetherViewModel
 
         private fun TogetherSessionState.sessionIdOrNull(): String? =
             when (this) {
-                is TogetherSessionState.Hosting -> sessionId
+                is TogetherSessionState.Hosting,
+                is TogetherSessionState.HostingManualWebRtc -> sessionId
 
                 is TogetherSessionState.HostingOnline -> sessionId
 
                 is TogetherSessionState.Joined -> sessionId
 
-                is TogetherSessionState.Joining -> TogetherLink.decode(joinLink)?.sessionId
+                is TogetherSessionState.Joining,
+                TogetherSessionState.JoiningManualWebRtc -> null
 
                 is TogetherSessionState.JoiningOnline -> code
 
