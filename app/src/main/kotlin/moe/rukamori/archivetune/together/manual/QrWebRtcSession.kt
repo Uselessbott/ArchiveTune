@@ -4,6 +4,7 @@ import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
 import moe.rukamori.archivetune.together.webrtc.WebRtcTransport
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -25,6 +26,9 @@ class QrWebRtcSession(
     val qrPackets: StateFlow<List<String>> = _qrPackets.asStateFlow()
 
     private var remoteSessionId: String? = null
+
+    private val pendingIceCandidates = mutableListOf<ManualIceCandidate>()
+    private val iceMutex = Mutex()
 
 
     private val _exchangeState =
@@ -162,6 +166,7 @@ class QrWebRtcSession(
         transport.disconnect()
         _exchangeState.value = QrExchangeState.Idle
         _qrPackets.value = emptyList()
+        pendingIceCandidates.clear()
         remoteSessionId = null
     }
 }
