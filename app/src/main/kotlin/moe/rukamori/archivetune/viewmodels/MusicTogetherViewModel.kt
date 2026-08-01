@@ -900,7 +900,8 @@ class MusicTogetherViewModel
 
         private fun TogetherSessionState.sessionIdOrNull(): String? =
             when (this) {
-                is TogetherSessionState.Hosting,
+                is TogetherSessionState.Hosting -> sessionId
+
                 is TogetherSessionState.HostingManualWebRtc -> sessionId
 
                 is TogetherSessionState.HostingOnline -> sessionId
