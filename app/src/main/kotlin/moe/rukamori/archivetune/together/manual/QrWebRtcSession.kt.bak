@@ -1,0 +1,74 @@
+package moe.rukamori.archivetune.together.manual
+
+import java.util.UUID
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import moe.rukamori.archivetune.together.webrtc.WebRtcTransport
+
+class QrWebRtcSession(
+    private val transport: WebRtcTransport,
+) {
+
+    val sessionId: String = UUID.randomUUID().toString()
+
+    private val _exchangeState =
+        MutableStateFlow<QrExchangeState>(QrExchangeState.Idle)
+
+    val exchangeState: StateFlow<QrExchangeState> =
+        _exchangeState.asStateFlow()
+
+    suspend fun startHost() {
+        _exchangeState.value = QrExchangeState.CreatingOffer
+
+        // Phase 2B
+        // transport.host()
+        // createOffer()
+        // setLocalDescription()
+        // encode into exactly four QR payloads
+
+        _exchangeState.value =
+            QrExchangeState.WaitingForRemoteAnswer
+    }
+
+    suspend fun startGuest() {
+        _exchangeState.value = QrExchangeState.WaitingForOffer
+
+        // Phase 2B
+        // Waiting for imported offer QR payloads.
+    }
+
+    suspend fun handleOffer(
+        offer: ManualOffer,
+    ) {
+        _exchangeState.value = QrExchangeState.CreatingAnswer
+
+        // Phase 2B
+        // setRemoteDescription()
+        // createAnswer()
+        // setLocalDescription()
+        // encode answer into exactly four QR payloads
+    }
+
+    suspend fun handleAnswer(
+        answer: ManualAnswer,
+    ) {
+        _exchangeState.value = QrExchangeState.Connecting
+
+        // Phase 2B
+        // Apply remote answer.
+    }
+
+    suspend fun handleIce(
+        candidate: ManualIceCandidate,
+    ) {
+        // Phase 3
+        // Batch ICE candidates.
+        // Encode/decode through QR.
+    }
+
+    fun close() {
+        transport.disconnect()
+        _exchangeState.value = QrExchangeState.Idle
+    }
+}

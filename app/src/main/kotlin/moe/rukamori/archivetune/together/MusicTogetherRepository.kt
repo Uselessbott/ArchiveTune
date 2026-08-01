@@ -35,6 +35,7 @@ import javax.inject.Singleton
 enum class MusicTogetherConnectionMode {
     LAN,
     ONLINE,
+    MANUAL_WEBRTC,
     CUSTOM,
 }
 
@@ -164,6 +165,13 @@ class MusicTogetherRepository
                     )
                 }
 
+                MusicTogetherConnectionMode.MANUAL_WEBRTC -> {
+                    service.startTogetherManualWebRtcHost(
+                        displayName = displayName,
+                        settings = settings,
+                    )
+                }
+
                 MusicTogetherConnectionMode.CUSTOM -> {
                     service.startTogetherCustomHost(
                         port = port,
@@ -189,6 +197,10 @@ class MusicTogetherRepository
                         displayName,
                         useWebRtc,
                     )
+
+                MusicTogetherConnectionMode.MANUAL_WEBRTC ->
+                    service.joinTogetherManualWebRtc(displayName)
+
                 MusicTogetherConnectionMode.CUSTOM -> service.joinTogetherCustom(rawInput, displayName)
             }
         }

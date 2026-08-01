@@ -1,0 +1,95 @@
+package moe.rukamori.archivetune.together.manual
+
+import android.util.Base64
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import moe.rukamori.archivetune.together.TogetherJson
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
+
+/**
+ * Transforms QrSignalPacket ↔ List<String> (QR‑safe chunks).
+ *
+ * Encoding:
+ *   QrSignalPacket → JSON (via TogetherJson) → GZIP → Base64 URL_SAFE → split into QR_COUNT chunks.
+ *
+ * Decoding reverses the pipeline.
+ *
+ * This codec does NOT interpret the payload; it only wraps/unwraps the packet.
+ * The caller is responsible for serializing the actual offer/answer/ice into packet.payload.
+ */
+object QrCodec {
+
+    /**
+     * Encodes a QrSignalPacket into exactly [ManualQrProtocol.QR_COUNT] strings.
+     * @throws QrCodecException if serialization or compression fails.
+     */
+    fun encode(packet: QrSignalPacket): List<String> {
+        return try {
+            val json = TogetherJson.json.encodeToString(packet)
+            val compressed = gzipCompress(json.toByteArray(Charsets.UTF_8))
+            val base64 = Base64.encodeToString(compressed, Base64.URL_SAFE or Base64.NO_WRAP)
+            splitIntoChunks(base64, ManualQrProtocol.QR_COUNT)
+        } catch (e: Exception) {
+            throw QrCodecException("Failed to encode QR packet", e)
+        }
+    }
+
+    /**
+     * Decodes a list of exactly [ManualQrProtocol.QR_COUNT] strings back into a QrSignalPacket.
+     * @throws QrCodecException if decoding, decompression, or deserialization fails.
+     */
+    fun decode(parts: List<String>): QrSignalPacket {
+        require(parts.size == ManualQrProtocol.QR_COUNT) {
+            "Expected exactly ${ManualQrProtocol.QR_COUNT} parts, got ${parts.size}"
+        }
+        return try {
+            val combined = parts.joinToString("")
+            val decodedBytes = Base64.decode(combined, Base64.URL_SAFE or Base64.NO_WRAP)
+            val decompressed = gzipDecompress(decodedBytes)
+            val json = String(decompressed, Charsets.UTF_8)
+            TogetherJson.json.decodeFromString<QrSignalPacket>(json)
+        } catch (e: Exception) {
+            throw QrCodecException("Failed to decode QR packet", e)
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------
+
+    private fun gzipCompress(data: ByteArray): ByteArray {
+        ByteArrayOutputStream().use { baos ->
+            GZIPOutputStream(baos).use { gzip ->
+                gzip.write(data)
+            }
+            return baos.toByteArray()
+        }
+    }
+
+    private fun gzipDecompress(data: ByteArray): ByteArray {
+        ByteArrayInputStream(data).use { bais ->
+            GZIPInputStream(bais).use { gzip ->
+                return gzip.readBytes()
+            }
+        }
+    }
+
+    private fun splitIntoChunks(input: String, chunkCount: Int): List<String> {
+        val len = input.length
+        val chunkSize = (len + chunkCount - 1) / chunkCount   // ceiling division
+        return List(chunkCount) { i ->
+            val start = minOf(i * chunkSize, len)
+            val end = minOf(start + chunkSize, len)
+            input.substring(start, end)
+        }
+    }
+}
+
+/**
+ * Exception thrown by QrCodec on encoding/decoding failures.
+ */
+class QrCodecException(message: String, cause: Throwable? = null) :
+    Exception(message, cause)

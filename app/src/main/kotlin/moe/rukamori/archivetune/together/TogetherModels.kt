@@ -82,6 +82,13 @@ sealed class TogetherSessionState {
         val roomState: TogetherRoomState?,
     ) : TogetherSessionState()
 
+
+    data class HostingManualWebRtc(
+        val sessionId: String,
+        val settings: TogetherRoomSettings,
+        val roomState: TogetherRoomState?,
+    ) : TogetherSessionState()
+
     data class Joining(
         val joinLink: String,
     ) : TogetherSessionState()
@@ -89,6 +96,9 @@ sealed class TogetherSessionState {
     data class JoiningOnline(
         val code: String,
     ) : TogetherSessionState()
+
+
+    data object JoiningManualWebRtc : TogetherSessionState()
 
     data class Joined(
         val role: TogetherRole,
@@ -110,11 +120,14 @@ val TogetherSessionState.isConnectedToSession: Boolean
 
             is TogetherSessionState.HostingOnline -> roomState != null
 
+            is TogetherSessionState.HostingManualWebRtc -> roomState != null
+
             is TogetherSessionState.Joined -> true
 
             TogetherSessionState.Idle,
             is TogetherSessionState.Joining,
             is TogetherSessionState.JoiningOnline,
+            TogetherSessionState.JoiningManualWebRtc,
             is TogetherSessionState.Error,
             -> false
         }
