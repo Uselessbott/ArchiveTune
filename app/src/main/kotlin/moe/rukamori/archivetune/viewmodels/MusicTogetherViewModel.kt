@@ -558,12 +558,14 @@ class MusicTogetherViewModel
                     is TogetherSessionState.Joined -> state.role is TogetherRole.Host
 
                     else -> false
+                }
 
             val isCreatingSessionLoading =
                 when (state) {
                     is TogetherSessionState.Hosting -> state.roomState == null
                     is TogetherSessionState.HostingOnline -> state.roomState == null
                     else -> false
+                }
 
             val isJoinedAsGuest = state is TogetherSessionState.Joined && state.role is TogetherRole.Guest
             val isWaitingApproval =
