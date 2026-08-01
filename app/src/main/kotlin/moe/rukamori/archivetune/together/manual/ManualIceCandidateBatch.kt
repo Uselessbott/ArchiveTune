@@ -1,11 +1,11 @@
 package moe.rukamori.archivetune.together.manual
 
 import kotlinx.serialization.Serializable
-import moe.rukamori.archivetune.together.webrtc.IceCandidateDto
+import moe.rukamori.archivetune.together.ManualQrProtocol
 
 @Serializable
 data class ManualIceCandidateBatch(
-    val version: Int = 1,
+    val version: Int = ManualQrProtocol.VERSION,
     val sessionId: String,
-    val candidates: List<IceCandidateDto>,
+    val candidates: List<ManualIceCandidate>,
 )

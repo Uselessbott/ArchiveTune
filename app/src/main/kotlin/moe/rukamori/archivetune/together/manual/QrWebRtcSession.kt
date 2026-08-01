@@ -14,6 +14,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import moe.rukamori.archivetune.together.webrtc.WebRtcTransport
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -45,6 +46,8 @@ class QrWebRtcSession(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val pendingIceCandidates = mutableListOf<ManualIceCandidate>()
+
+    private val seenRemoteIce = hashSetOf<String>()
     private val iceMutex = Mutex()
 
 
@@ -150,6 +153,7 @@ private fun startIceCollection()
     }
 
     suspend fun submitPackets(packets: List<String>) {
+        try {
         val currentState = _exchangeState.value
         require(
             currentState is QrExchangeState.WaitingForOffer ||
@@ -176,25 +180,67 @@ private fun startIceCollection()
                 handleAnswer(answer)
             }
             QrSignalKind.ICE -> {
-                val batch =
-                    TogetherJson.json.decodeFromString<ManualIceCandidateBatch>(
-                        signalPacket.payload
-                    )
-
-                batch.candidates.forEach { dto ->
-                    handleIce(
-                        ManualIceCandidate(
-                            version = batch.version,
-                            sessionId = batch.sessionId,
-                            candidate = dto,
-                        )
-                    )
-                }
+                handleIceBatch(signalPacket)
             }
+                }
+        } catch (t: Throwable) {
+            _exchangeState.value =
+                QrExchangeState.Failed(
+                    t.message ?: "Failed to process QR packet",
+                )
         }
     }
 
-    private fun sdpTypeFromString(type: String): SessionDescription.Type {
+    
+
+    suspend fun exportPendingIce() {
+        val batch = iceMutex.withLock {
+            if (pendingIceCandidates.isEmpty()) return
+
+            ManualIceCandidateBatch(
+                sessionId = remoteSessionId ?: sessionId,
+                candidates = pendingIceCandidates.toList(),
+            )
+        }
+
+        val json = TogetherJson.json.encodeToString(batch)
+
+        iceMutex.withLock {
+            pendingIceCandidates.clear()
+        }
+
+        val packet = QrSignalPacket(
+            version = ManualQrProtocol.VERSION,
+            sessionId = batch.sessionId,
+            kind = QrSignalKind.ICE,
+            part = REASSEMBLED_PART,
+            total = ManualQrProtocol.QR_COUNT,
+            payload = json,
+        )
+
+        _qrPackets.value = QrCodec.encode(packet)
+    }
+
+
+    private suspend fun handleIceBatch(packet: QrSignalPacket) {
+        val batch =
+            TogetherJson.json.decodeFromString<ManualIceCandidateBatch>(
+                packet.payload,
+            )
+
+        val expected = remoteSessionId ?: sessionId
+
+        require(batch.sessionId == expected) {
+            "ICE session mismatch"
+        }
+
+        batch.candidates.forEach {
+            transport.addRemoteIceCandidate(it.candidate)
+        }
+    }
+
+
+private fun sdpTypeFromString(type: String): SessionDescription.Type {
         return when (type.lowercase()) {
             "offer" -> SessionDescription.Type.OFFER
             "answer" -> SessionDescription.Type.ANSWER
@@ -285,6 +331,19 @@ private fun startIceCollection()
     suspend fun handleIce(
         candidate: ManualIceCandidate,
     ) {
+        val key =
+            buildString {
+                append(candidate.candidate.sdpMid)
+                append(':')
+                append(candidate.candidate.sdpMLineIndex)
+                append(':')
+                append(candidate.candidate.candidate)
+            }
+
+        if (!seenRemoteIce.add(key)) {
+            return
+        }
+
         transport.addRemoteIceCandidate(candidate.candidate)
     }
 
@@ -296,6 +355,7 @@ private fun startIceCollection()
         connectionObserverJob?.cancel()
         scope.cancel()
         pendingIceCandidates.clear()
+        seenRemoteIce.clear()
         remoteSessionId = null
     }
 }

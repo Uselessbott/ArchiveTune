@@ -269,6 +269,12 @@ private fun MusicTogetherContent(
                         onLeave = viewModel::leaveSession,
                     )
                 }
+
+                item(contentType = "manual_qr") {
+                    Text(
+                        text = model.qrExchangeState::class.simpleName ?: "Manual QR",
+                    )
+                }
                 item(contentType = "playback") {
                     PlaybackCard(playback = model.playback)
                 }
@@ -334,6 +340,12 @@ private fun MusicTogetherContent(
                     onCopy = viewModel::copySessionValue,
                     onShare = viewModel::shareSessionValue,
                     onLeave = viewModel::leaveSession,
+                )
+            }
+
+            item(contentType = "manual_qr") {
+                Text(
+                    text = model.qrExchangeState::class.simpleName ?: "Manual QR",
                 )
             }
             item(contentType = "playback") {

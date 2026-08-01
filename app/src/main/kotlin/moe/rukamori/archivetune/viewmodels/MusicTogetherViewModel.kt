@@ -74,6 +74,8 @@ data class MusicTogetherUiModel(
     val join: MusicTogetherJoinUiModel,
     val participants: MusicTogetherParticipantUiModels,
     val activityLog: MusicTogetherActivityLogUiModels,
+    val qrExchangeState: moe.rukamori.archivetune.together.manual.QrExchangeState,
+    val qrPackets: List<String>,
 )
 
 @Immutable
@@ -325,6 +327,28 @@ class MusicTogetherViewModel
                     .collect { sessionState ->
                         updateActivityLog(sessionState)
                     }
+
+
+            launch {
+                repository.manualQrPackets.collect { packets ->
+                    _state.update {
+                        it.copy(
+                            qrPackets = packets,
+                        )
+                    }
+                }
+            }
+
+            launch {
+                repository.manualQrExchangeState.collect { exchange ->
+                    _state.update {
+                        it.copy(
+                            qrExchangeState = exchange,
+                        )
+                    }
+                }
+            }
+
             }
         }
 
@@ -544,6 +568,8 @@ class MusicTogetherViewModel
             welcomeDismissed: Boolean,
             dontShowAgain: Boolean,
             log: MusicTogetherActivityLogUiModels,
+            qrExchangeState: moe.rukamori.archivetune.together.manual.QrExchangeState,
+            qrPackets: List<String>,
         ): MusicTogetherUiModel {
             val state = sessionState
             val roomState = state.roomStateOrNull()
@@ -702,6 +728,8 @@ class MusicTogetherViewModel
                 join = join,
                 participants = participantModels,
                 activityLog = log,
+                qrExchangeState = qrExchangeState,
+                qrPackets = qrPackets,
             )
         }
 
@@ -933,6 +961,30 @@ class MusicTogetherViewModel
             }
             return null
         }
+
+
+        fun submitQrPackets(
+            packets: List<String>,
+        ) {
+            viewModelScope.launch {
+                repository.submitManualQrPackets(packets)
+            }
+        }
+
+        fun exportPendingIce() {
+            viewModelScope.launch {
+                repository.exportManualIce()
+            }
+        }
+
+        fun clearQrPackets() {
+            _state.update {
+                it.copy(
+                    qrPackets = emptyList(),
+                )
+            }
+        }
+
 
         private companion object {
             const val MaxActivityLogSize = 80

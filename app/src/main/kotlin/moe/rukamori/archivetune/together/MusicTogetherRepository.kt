@@ -209,6 +209,30 @@ class MusicTogetherRepository
             serviceFlow.value?.leaveTogether()
         }
 
+
+        val manualQrPackets: Flow<List<String>> =
+            serviceFlow.flatMapLatest { service ->
+                service?.qrPackets ?: flowOf(emptyList())
+            }
+
+        val manualQrExchangeState: Flow<moe.rukamori.archivetune.together.manual.QrExchangeState> =
+            serviceFlow.flatMapLatest { service ->
+                service?.qrExchangeState ?: flowOf(
+                    moe.rukamori.archivetune.together.manual.QrExchangeState.Idle
+                )
+            }
+
+        suspend fun submitManualQrPackets(
+            packets: List<String>,
+        ) {
+            serviceFlow.value?.submitManualQrPackets(packets)
+        }
+
+        suspend fun exportManualIce() {
+            serviceFlow.value?.exportManualIce()
+        }
+
+
         fun updateSettings(settings: TogetherRoomSettings) {
             serviceFlow.value?.updateTogetherSettings(settings)
         }

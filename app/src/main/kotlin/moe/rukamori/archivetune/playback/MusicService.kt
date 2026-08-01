@@ -244,6 +244,8 @@ import moe.rukamori.archivetune.together.TogetherJoinInfo
 import moe.rukamori.archivetune.together.TogetherRoomSettings
 import moe.rukamori.archivetune.together.TogetherSessionState
 import moe.rukamori.archivetune.together.ManualQrState
+import moe.rukamori.archivetune.together.manual.QrWebRtcSession
+import moe.rukamori.archivetune.together.manual.QrExchangeState
 import moe.rukamori.archivetune.ui.screens.settings.DiscordPresenceManager
 import moe.rukamori.archivetune.ui.screens.settings.ListenBrainzManager
 import moe.rukamori.archivetune.utils.AuthScopedCacheValue
@@ -736,6 +738,18 @@ class MusicService :
         MutableStateFlow<ManualQrState>(ManualQrState.Idle)
     val manualQrState: StateFlow<ManualQrState> =
         _manualQrState.asStateFlow()
+
+
+    private var qrSession: QrWebRtcSession? = null
+
+
+    val qrPackets
+        get() = qrSession?.qrPackets
+
+    val qrExchangeState
+        get() = qrSession?.exchangeState
+
+
 
     // Phase 8B: Expose transport state and failure events directly (no duplication)
     val transportState: StateFlow<WebRtcConnectionState> by lazy {
@@ -4580,7 +4594,11 @@ class MusicService :
                             recoverable = true,
                         )
                 }
-                ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
                 return@launch
             }
 
@@ -4774,7 +4792,11 @@ class MusicService :
                                                 recoverable = true,
                                             )
                                     }
-                                    ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                                    ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
                                 }
                             }
 
@@ -4808,7 +4830,11 @@ class MusicService :
                                                     recoverable = true,
                                                 )
                                         }
-                                        ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                                        ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
                                     }
                                 }
                             }
@@ -4830,7 +4856,11 @@ class MusicService :
                                             recoverable = true,
                                         )
                                 }
-                                ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                                ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
                             }
 
                             moe.rukamori.archivetune.together.TogetherClientEvent.Disconnected -> {
@@ -4851,7 +4881,11 @@ class MusicService :
                                             recoverable = true,
                                         )
                                 }
-                                ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                                ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
                             }
                         }
                     }
@@ -5039,7 +5073,11 @@ class MusicService :
                                                 recoverable = true,
                                             )
                                     }
-                                    ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                                    ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
                                 }
                             }
 
@@ -5073,7 +5111,11 @@ class MusicService :
                                                     recoverable = true,
                                                 )
                                         }
-                                        ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                                        ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
                                     }
                                 }
                             }
@@ -5095,7 +5137,11 @@ class MusicService :
                                             recoverable = true,
                                         )
                                 }
-                                ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                                ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
                             }
 
                             moe.rukamori.archivetune.together.TogetherClientEvent.Disconnected -> {
@@ -5116,7 +5162,11 @@ class MusicService :
                                             recoverable = true,
                                         )
                                 }
-                                ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                                ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
                             }
                         }
                     }
@@ -5136,7 +5186,11 @@ class MusicService :
                             recoverable = true,
                         )
                 }
-                ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
                 return@launch
             }
 
@@ -5149,6 +5203,19 @@ class MusicService :
         }
     }
 
+
+
+    suspend fun submitManualQrPackets(
+        packets: List<String>,
+    ) {
+        qrSession?.submitPackets(packets)
+    }
+
+    suspend fun exportManualIce() {
+        qrSession?.exportPendingIce()
+    }
+
+
     fun leaveTogether() {
         _connectionState.value = TogetherConnectionState.Idle
         ensureScopesActive()
@@ -5159,7 +5226,11 @@ class MusicService :
         scope.launch(SilentHandler) {
             togetherSessionState.value = moe.rukamori.archivetune.together.TogetherSessionState.Idle
         }
-        ioScope.launch(SilentHandler) { stopTogetherInternal() }
+        ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
     }
 
     fun updateTogetherSettings(settings: moe.rukamori.archivetune.together.TogetherRoomSettings) {
@@ -5404,7 +5475,11 @@ class MusicService :
                         message = event.message,
                         recoverable = true,
                     )
-                ioScope.launch(SilentHandler) { stopTogetherInternal() }
+                ioScope.launch(SilentHandler) {
+            qrSession?.close()
+            qrSession = null
+            stopTogetherInternal()
+        }
             }
 
             else -> {
@@ -5814,11 +5889,22 @@ class MusicService :
 
         ioScope.launch(SilentHandler) {
             stopTogetherInternal()
+
             togetherIsOnlineSession = false
             storedJoinDisplayName = displayName
+
+            if (qrSession == null) qrSession = QrWebRtcSession(webRtcTransport)
+
+            qrSession!!.startHost()
+
             _manualQrState.value = ManualQrState.HostReadyToGenerate
+
             togetherSessionState.value =
-                moe.rukamori.archivetune.together.TogetherSessionState.Idle
+                TogetherSessionState.HostingManualWebRtc(
+                    sessionId = qrSession!!.sessionId,
+                    settings = settings,
+                    roomState = null,
+                )
         }
     }
 
@@ -5832,11 +5918,18 @@ class MusicService :
 
         ioScope.launch(SilentHandler) {
             stopTogetherInternal()
+
             togetherIsOnlineSession = false
             storedJoinDisplayName = displayName
+
+            if (qrSession == null) qrSession = QrWebRtcSession(webRtcTransport)
+
+            qrSession!!.startGuest()
+
             _manualQrState.value = ManualQrState.GuestReadyToImport
+
             togetherSessionState.value =
-                moe.rukamori.archivetune.together.TogetherSessionState.Idle
+                TogetherSessionState.JoiningManualWebRtc
         }
     }
 
