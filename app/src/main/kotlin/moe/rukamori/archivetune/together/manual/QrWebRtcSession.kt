@@ -91,8 +91,7 @@ class QrWebRtcSession(
         }
     }
 
-private fun startIceCollection()
-        observeConnectionState() {
+private fun startIceCollection() {
         iceCollectionJob?.cancel()
         connectionObserverJob?.cancel()
 
@@ -108,7 +107,6 @@ private fun startIceCollection()
 
 
                 flushIceCandidates()
-                continue
 
                 } finally {
                     iceMutex.unlock()
