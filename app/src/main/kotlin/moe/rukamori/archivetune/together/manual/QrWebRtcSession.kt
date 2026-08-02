@@ -302,7 +302,7 @@ private fun sdpTypeFromString(type: String): SessionDescription.Type {
             val batch = ManualIceCandidateBatch(
                 version = ManualQrProtocol.VERSION,
                 sessionId = sessionId,
-                candidates = pendingIceCandidates.map { it.candidate }
+                candidates = pendingIceCandidates.toList()
             )
 
             val json = TogetherJson.json.encodeToString(batch)

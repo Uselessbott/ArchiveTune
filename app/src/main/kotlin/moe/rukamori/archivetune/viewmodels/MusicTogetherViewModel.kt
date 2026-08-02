@@ -330,26 +330,6 @@ class MusicTogetherViewModel
 
             }
         }
-
-        init {
-            viewModelScope.launch {
-                repository.manualQrPackets.collect { packets ->
-                    _state.update {
-                        it.copy(
-                            qrPackets = packets,
-                        )
-                    }
-                }
-            }
-
-            viewModelScope.launch {
-                repository.manualQrExchangeState.collect { exchange ->
-                    _state.update {
-                        it.copy(
-                            qrExchangeState = exchange,
-                        )
-                    }
-                }
             }
         }
 
