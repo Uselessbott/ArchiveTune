@@ -126,6 +126,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.OutlinedButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1079,28 +1080,9 @@ SectionCard(
             }
 
 
-            Spacer(Modifier.height(8.dp)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Scan QR")
-                }
+            Spacer(Modifier.height(8.dp))
 
-                OutlinedButton(
-                    onClick = { },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Import QR Image")
-                }
-
-                OutlinedButton(
-                    onClick = { },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Paste QR Data")
-                }
-            }
-
-            if (model.qrPackets.isNotEmpty()) {
+if (model.qrPackets.isNotEmpty()) {
                 Text(
                     text = "QR packets: ${model.qrPackets.size}",
                     style = MaterialTheme.typography.bodySmall,
