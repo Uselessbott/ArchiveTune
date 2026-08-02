@@ -121,7 +121,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -971,9 +970,7 @@ private fun ManualQrSection(
 
     val qrBitmaps =
         remember(model.manualQr.pages) {
-            model.qrPackets.map {
-                moe.rukamori.archivetune.together.manual.QrBitmapGenerator.generate(it)
-            }
+            model.manualQr.pages.map { it.bitmap }
         }
 
 SectionCard(
