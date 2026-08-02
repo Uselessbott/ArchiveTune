@@ -276,6 +276,8 @@ class MusicTogetherViewModel
                                     useWebRtc = false,
                                 ),
                             sessionState = TogetherSessionState.Error(message = throwable.message.orEmpty()),
+                            qrExchangeState = moe.rukamori.archivetune.together.manual.QrExchangeState.Idle,
+                            qrPackets = emptyList(),
                         ),
                     )
                 }
@@ -947,3 +949,5 @@ class MusicTogetherViewModel
 
         private companion object {
             const val MaxActivityLogSize = 80
+}
+}
