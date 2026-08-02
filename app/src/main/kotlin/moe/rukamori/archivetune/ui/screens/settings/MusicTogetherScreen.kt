@@ -762,6 +762,24 @@ private fun HostControlsCard(
             onCheckedChange = viewModel::setRequireHostApprovalToJoin,
         )
 
+
+        if (host.useWebRtc) {
+            HorizontalDivider()
+
+            Text(
+                text = "QR Pairing",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            ManualQrSection(
+                model = model,
+                viewModel = viewModel,
+            )
+
+            Spacer(Modifier.height(MusicTogetherSpacing.sm))
+        }
+
         Button(
             enabled = host.startEnabled,
             onClick = viewModel::startSession,
@@ -883,6 +901,41 @@ private fun JoinControlsCard(
         }
     }
 }
+
+@Composable
+private fun ManualQrSection(
+    model: MusicTogetherUiModel,
+    viewModel: MusicTogetherViewModel,
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+
+            Text(
+                text = "QR Pairing",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            Text(
+                text = model.qrExchangeState.toString(),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            if (model.qrPackets.isNotEmpty()) {
+                Text(
+                    text = "QR packets: ${model.qrPackets.size}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun ParticipantsCard(
