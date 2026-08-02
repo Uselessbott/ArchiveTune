@@ -115,6 +115,8 @@ import moe.rukamori.archivetune.viewmodels.MusicTogetherUiModel
 import moe.rukamori.archivetune.viewmodels.MusicTogetherTransportMode
 import moe.rukamori.archivetune.viewmodels.MusicTogetherViewModel
 import moe.rukamori.archivetune.ui.component.IconButton as AtIconButton
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -271,10 +273,13 @@ private fun MusicTogetherContent(
                     )
                 }
 
-                item(contentType = "manual_qr") {
-                    Text(
-                        text = model.qrExchangeState::class.simpleName ?: "Manual QR",
-                    )
+                if (model.host.useWebRtc || model.join.useWebRtc) {
+                    item(contentType = "manual_qr") {
+                        ManualQrSection(
+                            model = model,
+                            viewModel = viewModel,
+                        )
+                    }
                 }
                 item(contentType = "playback") {
                     PlaybackCard(playback = model.playback)
@@ -344,10 +349,13 @@ private fun MusicTogetherContent(
                 )
             }
 
-            item(contentType = "manual_qr") {
-                Text(
-                    text = model.qrExchangeState::class.simpleName ?: "Manual QR",
-                )
+            if (model.host.useWebRtc || model.join.useWebRtc) {
+                item(contentType = "manual_qr") {
+                    ManualQrSection(
+                        model = model,
+                        viewModel = viewModel,
+                    )
+                }
             }
             item(contentType = "playback") {
                 PlaybackCard(playback = model.playback)
@@ -884,15 +892,106 @@ private fun JoinControlsCard(
     }
 }
 
+
+@Composable
+private fun ManualQrPacketCard(
+    index: Int,
+    total: Int,
+    bitmap: ImageBitmap?,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+
+            Text(
+                text = "QR ${index + 1}/$total",
+                style = MaterialTheme.typography.labelLarge,
+            )
+
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = null,
+                    modifier = Modifier.size(180.dp),
+                )
+            } else {
+                Box(
+                    modifier = Modifier.size(180.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularWavyProgressIndicator()
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ManualQrSection(
     model: MusicTogetherUiModel,
     viewModel: MusicTogetherViewModel,
 ) {
-    SectionCard(
+
+    val bringIntoViewRequester =
+        remember { BringIntoViewRequester() }
+
+    LaunchedEffect(model.qrPackets.size) {
+        if (model.qrPackets.isNotEmpty()) {
+            bringIntoViewRequester.bringIntoView()
+        }
+    }
+
+
+
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+
+    LaunchedEffect(model.qrPackets) {
+        if (model.qrPackets.isNotEmpty()) {
+            bringIntoViewRequester.bringIntoView()
+        }
+    }
+
+    val imagePicker =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent(),
+        ) { uri ->
+            if (uri != null) {
+                viewModel.importQrImage(
+                    context = context,
+                    uri = uri,
+                )
+            }
+        }
+
+
+    val qrBitmaps =
+        remember(model.qrPackets) {
+            model.qrPackets.map {
+                moe.rukamori.archivetune.together.manual.QrBitmapGenerator.generate(it)
+            }.toMutableStateList()
+        }
+
+
+    
+    val pagerState =
+        rememberPagerState {
+            qrBitmaps.size
+        }
+
+SectionCard(
+        modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester),
         iconResId = R.drawable.link,
         titleResId = R.string.join_session,
-        subtitle = "QR Pairing",
+        subtitle =
+            if (model.host.useWebRtc)
+                "Manual QR Host"
+            else
+                "Manual QR Join",
         accent = MaterialTheme.colorScheme.primary,
     ) {
         Column(
@@ -906,10 +1005,108 @@ private fun ManualQrSection(
                 fontWeight = FontWeight.SemiBold,
             )
 
+            
             Text(
                 text = model.qrExchangeState.toString(),
                 style = MaterialTheme.typography.bodyMedium,
             )
+
+
+            FilledTonalButton(
+                onClick = {
+                    imagePicker.launch("image/*")
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.image),
+                    contentDescription = null,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Import QR Screenshot")
+            }
+
+
+            Spacer(Modifier.height(8.dp))
+
+            if (model.host.useWebRtc) {
+
+                Text(
+                    text = "Generated QR codes: ${model.qrPackets.size}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(
+                        count = model.qrPackets.size,
+                        key = { it },
+                    ) { index ->
+                        ManualQrPacketCard(
+                            index = index,
+                            total = model.qrPackets.size,
+                            bitmap = qrBitmaps[index],
+                        )
+                    }
+                }
+
+            } else {
+
+                Text(
+                    text = "Waiting for QR import...",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = viewModel::exportPendingIce,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Export ICE")
+                }
+
+                OutlinedButton(
+                    onClick = viewModel::clearQrPackets,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Clear")
+                }
+            }
+
+
+            Spacer(Modifier.height(8.dp)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Scan QR")
+                }
+
+                OutlinedButton(
+                    onClick = { },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Import QR Image")
+                }
+
+                OutlinedButton(
+                    onClick = { },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Paste QR Data")
+                }
+            }
 
             if (model.qrPackets.isNotEmpty()) {
                 Text(

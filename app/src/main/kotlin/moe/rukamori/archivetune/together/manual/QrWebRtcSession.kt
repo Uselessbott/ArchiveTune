@@ -39,9 +39,13 @@ class QrWebRtcSession(
 
     private var remoteSessionId: String? = null
 
+    private var lastImportedFingerprint: Int? = null
+
+
 
     private var iceCollectionJob: Job? = null
     private var connectionObserverJob: Job? = null
+    private var pendingIceFlushJob: Job? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -71,6 +75,7 @@ class QrWebRtcSession(
                     }
 
                     WebRtcConnectionState.CONNECTED -> {
+                        cleanupAfterSuccessfulConnection()
                         _exchangeState.value = QrExchangeState.Connected
                     }
 
@@ -106,7 +111,15 @@ private fun startIceCollection() {
                     )
 
 
-                flushIceCandidates()
+                
+pendingIceFlushJob?.cancel()
+
+pendingIceFlushJob =
+    scope.launch {
+        kotlinx.coroutines.delay(750)
+        flushIceCandidates()
+    }
+
 
                 } finally {
                     iceMutex.unlock()
@@ -141,7 +154,10 @@ private fun startIceCollection() {
         )
         val qrStrings = QrCodec.encode(fullPacket)
         _qrPackets.value = qrStrings
-        _exchangeState.value = QrExchangeState.WaitingForRemoteAnswer
+
+        // Answer QR is immediately available.
+        _exchangeState.value =
+            QrExchangeState.WaitingForRemoteAnswer
     }
 
     suspend fun startGuest() {
@@ -159,6 +175,15 @@ private fun startIceCollection() {
         ) {
             "Unexpected state: $currentState"
         }
+
+        val fingerprint = packets.sorted().hashCode()
+
+        if (lastImportedFingerprint == fingerprint) {
+            return
+        }
+
+        lastImportedFingerprint = fingerprint
+
         val signalPacket = QrCodec.decode(packets)
         remoteSessionId = signalPacket.sessionId
         _qrPackets.value = emptyList()
@@ -345,6 +370,24 @@ private fun sdpTypeFromString(type: String): SessionDescription.Type {
         transport.addRemoteIceCandidate(candidate.candidate)
     }
 
+    fun resetManualQrSession() {
+        pendingIceCandidates.clear()
+        seenRemoteIce.clear()
+        remoteSessionId = null
+        _qrPackets.value = emptyList()
+        _exchangeState.value = QrExchangeState.Idle
+    }
+
+
+
+    private fun cleanupAfterSuccessfulConnection() {
+        pendingIceCandidates.clear()
+        seenRemoteIce.clear()
+        remoteSessionId = null
+        lastImportedFingerprint = null
+        _qrPackets.value = emptyList()
+    }
+
     fun close() {
         transport.disconnect()
         _exchangeState.value = QrExchangeState.Idle
@@ -355,5 +398,6 @@ private fun sdpTypeFromString(type: String): SessionDescription.Type {
         pendingIceCandidates.clear()
         seenRemoteIce.clear()
         remoteSessionId = null
+        lastImportedFingerprint = null
     }
 }

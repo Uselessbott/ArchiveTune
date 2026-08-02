@@ -81,8 +81,7 @@ data class MusicTogetherUiModel(
     val join: MusicTogetherJoinUiModel,
     val participants: MusicTogetherParticipantUiModels,
     val activityLog: MusicTogetherActivityLogUiModels,
-    val qrExchangeState: moe.rukamori.archivetune.together.manual.QrExchangeState,
-    val qrPackets: List<String>,
+    val manualQr: ManualQrUiModel,
 )
 
 @Immutable
@@ -197,6 +196,22 @@ data class MusicTogetherParticipantUiModel(
     val showModerationActions: Boolean,
     val showTransferHostAction: Boolean,
 )
+
+@Immutable
+data class ManualQrPageUiModel(
+    val index: Int,
+    val total: Int,
+    val bitmap: androidx.compose.ui.graphics.ImageBitmap,
+)
+
+
+@Immutable
+data class ManualQrUiModel(
+    val visible: Boolean,
+    val state: moe.rukamori.archivetune.together.manual.QrExchangeState,
+    val pages: List<ManualQrPageUiModel>,
+)
+
 
 @Immutable
 data class MusicTogetherActivityLogUiModels(
@@ -982,6 +997,43 @@ class MusicTogetherViewModel
                 if (participant.id == participantId) return participant
             }
             return null
+        }
+
+
+
+        fun submitQrPackets(
+            packets: List<String>,
+        ) {
+            viewModelScope.launch {
+                repository.submitManualQrPackets(packets)
+            }
+        }
+
+        fun exportPendingIce() {
+            viewModelScope.launch {
+                repository.exportManualIce()
+            }
+        }
+
+        fun clearQrPackets() {
+            // TODO: Replace with proper UI state clearing later.
+        }
+
+        fun importQrImage(
+            context: android.content.Context,
+            uri: android.net.Uri,
+        ) {
+            viewModelScope.launch {
+                runCatching {
+                    val packets =
+                        moe.rukamori.archivetune.together.manual.QrImportManager
+                            .importPackets(context, uri)
+
+                    if (packets.isNotEmpty()) {
+                        repository.submitManualQrPackets(packets)
+                    }
+                }
+            }
         }
 
 

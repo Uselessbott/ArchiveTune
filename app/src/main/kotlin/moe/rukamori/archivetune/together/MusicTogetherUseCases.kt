@@ -143,6 +143,18 @@ class MusicTogetherSessionActionsUseCase
             repository.leaveSession()
         }
 
+
+        suspend fun submitManualQrPackets(
+            packets: List<String>,
+        ) {
+            repository.submitManualQrPackets(packets)
+        }
+
+        suspend fun exportManualIce() {
+            repository.exportManualIce()
+        }
+
+
         fun updateSettings(settings: TogetherRoomSettings) {
             repository.updateSettings(settings)
         }
