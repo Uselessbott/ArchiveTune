@@ -67,7 +67,7 @@ class MusicTogetherRepository
         private val serviceFlow = MutableStateFlow<MusicService?>(null)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    private val manualQrState =
+    val manualQrState =
         serviceFlow.flatMapLatest {
             it?.manualQrState
                 ?: kotlinx.coroutines.flow.flowOf(

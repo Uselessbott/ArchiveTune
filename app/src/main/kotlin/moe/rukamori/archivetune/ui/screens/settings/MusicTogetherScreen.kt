@@ -8,6 +8,7 @@
 @file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
 
 package moe.rukamori.archivetune.ui.screens.settings
+import moe.rukamori.archivetune.together.ManualQrState
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -643,7 +644,7 @@ private fun SessionShareCard(
 @Composable
 private fun PlaybackCard(playback: MusicTogetherPlaybackUiModel) {
     Card(
-        modifier = modifier.width(170.dp),
+        modifier = Modifier,
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -906,6 +907,7 @@ private fun ManualQrPacketCard(
     index: Int,
     total: Int,
     bitmap: ImageBitmap?,
+    modifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier.width(170.dp),
