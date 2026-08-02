@@ -134,6 +134,7 @@ fun MusicTogetherScreen(
     navController: NavController,
     viewModel: MusicTogetherViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current
     val scrollBehavior = appBarScrollBehavior()
     val screenState by viewModel.state.collectAsStateWithLifecycle()
