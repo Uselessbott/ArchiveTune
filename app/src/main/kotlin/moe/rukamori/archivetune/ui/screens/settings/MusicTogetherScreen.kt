@@ -762,24 +762,6 @@ private fun HostControlsCard(
             onCheckedChange = viewModel::setRequireHostApprovalToJoin,
         )
 
-
-        if (host.useWebRtc) {
-            HorizontalDivider()
-
-            Text(
-                text = "QR Pairing",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-
-            ManualQrSection(
-                model = model,
-                viewModel = viewModel,
-            )
-
-            Spacer(Modifier.height(MusicTogetherSpacing.sm))
-        }
-
         Button(
             enabled = host.startEnabled,
             onClick = viewModel::startSession,
@@ -907,8 +889,10 @@ private fun ManualQrSection(
     model: MusicTogetherUiModel,
     viewModel: MusicTogetherViewModel,
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+    SectionCard(
+        iconResId = R.drawable.link,
+        title = "QR Pairing",
+        accent = MaterialTheme.colorScheme.primary,
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
