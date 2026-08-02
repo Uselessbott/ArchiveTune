@@ -643,7 +643,7 @@ private fun SessionShareCard(
 @Composable
 private fun PlaybackCard(playback: MusicTogetherPlaybackUiModel) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.width(170.dp),
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -908,7 +908,7 @@ private fun ManualQrPacketCard(
     bitmap: ImageBitmap?,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.width(170.dp),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -1019,7 +1019,7 @@ SectionCard(
 
             Spacer(Modifier.height(8.dp))
 
-            if (model.host.useWebRtc) {
+            
 
                 Text(
                     text = "Generated QR codes: ${model.manualQr.pages.size}",
@@ -1039,6 +1039,7 @@ SectionCard(
                             index = page.index,
                             total = page.total,
                             bitmap = page.bitmap,
+                            modifier = Modifier.fillMaxWidth(0.48f),
                         )
                     }
                 }
