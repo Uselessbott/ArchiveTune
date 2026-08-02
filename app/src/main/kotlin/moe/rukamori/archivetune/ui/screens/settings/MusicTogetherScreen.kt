@@ -1042,7 +1042,6 @@ SectionCard(
                         )
                     }
                 }
-                }
 
             } else {
 
