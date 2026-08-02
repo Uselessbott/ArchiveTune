@@ -28,10 +28,17 @@ class ObserveMusicTogetherStateUseCase
         private val repository: MusicTogetherRepository,
     ) {
         operator fun invoke(): Flow<MusicTogetherSnapshot> =
-            combine(repository.preferences, repository.sessionState) { preferences, sessionState ->
+            combine(
+                repository.preferences,
+                repository.sessionState,
+                repository.manualQrExchangeState,
+                repository.manualQrPackets,
+            ) { preferences, sessionState, qrExchangeState, qrPackets ->
                 MusicTogetherSnapshot(
                     preferences = preferences,
                     sessionState = sessionState,
+                    qrExchangeState = qrExchangeState,
+                    qrPackets = qrPackets,
                 )
             }
     }

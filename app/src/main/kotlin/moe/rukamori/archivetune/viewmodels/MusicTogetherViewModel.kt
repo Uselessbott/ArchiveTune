@@ -306,6 +306,8 @@ class MusicTogetherViewModel
                                 welcomeDismissed = stateInputs.welcomeDismissed,
                                 dontShowAgain = dontShowAgain,
                                 log = log,
+                                qrExchangeState = stateInputs.snapshot.qrExchangeState,
+                                qrPackets = stateInputs.snapshot.qrPackets,
                             ),
                         )
                     screenState

@@ -53,6 +53,8 @@ data class MusicTogetherPreferences(
 data class MusicTogetherSnapshot(
     val preferences: MusicTogetherPreferences,
     val sessionState: TogetherSessionState,
+    val qrExchangeState: moe.rukamori.archivetune.together.manual.QrExchangeState,
+    val qrPackets: List<String>,
 )
 
 @Singleton
