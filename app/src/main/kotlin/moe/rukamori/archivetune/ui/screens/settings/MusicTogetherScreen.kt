@@ -891,7 +891,8 @@ private fun ManualQrSection(
 ) {
     SectionCard(
         iconResId = R.drawable.link,
-        title = "QR Pairing",
+        titleResId = R.string.join_session,
+        subtitle = "QR Pairing",
         accent = MaterialTheme.colorScheme.primary,
     ) {
         Column(
