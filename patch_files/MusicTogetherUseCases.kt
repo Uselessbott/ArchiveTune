@@ -1,0 +1,182 @@
+/*
+ * ArchiveTune (2026)
+ * © Rukamori — github.com/rukamori
+ * GPL-3.0 License | Contributors: see git history
+ * Do not remove or alter this notice. - Per GPL-3.0 Section 4 & Section 5
+ */
+
+package moe.rukamori.archivetune.together
+
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import moe.rukamori.archivetune.playback.MusicService
+import javax.inject.Inject
+
+class AttachMusicTogetherServiceUseCase
+    @Inject
+    constructor(
+        private val repository: MusicTogetherRepository,
+    ) {
+        operator fun invoke(service: MusicService?) {
+            repository.attachService(service)
+        }
+    }
+
+class ObserveMusicTogetherStateUseCase
+    @Inject
+    constructor(
+        private val repository: MusicTogetherRepository,
+    ) {
+        operator fun invoke(): Flow<MusicTogetherSnapshot> =
+            combine(
+                repository.preferences,
+                repository.sessionState,
+                repository.manualQrState,
+                repository.manualQrExchangeState,
+                repository.manualQrPackets,
+            ) { preferences, sessionState, manualQrState, qrExchangeState, qrPackets ->
+                MusicTogetherSnapshot(
+                    preferences = preferences,
+                    sessionState = sessionState,
+                    manualQrState = manualQrState,
+                    qrExchangeState = qrExchangeState,
+                    qrPackets = qrPackets,
+                )
+            }
+    }
+
+class UpdateMusicTogetherPreferencesUseCase
+    @Inject
+    constructor(
+        private val repository: MusicTogetherRepository,
+    ) {
+        suspend fun setDisplayName(displayName: String) {
+            repository.setDisplayName(displayName)
+        }
+
+        suspend fun setPort(port: Int) {
+            repository.setPort(port)
+        }
+
+        suspend fun setAllowGuestsToAddTracks(value: Boolean) {
+            repository.setAllowGuestsToAddTracks(value)
+        }
+
+        suspend fun setAllowGuestsToControlPlayback(value: Boolean) {
+            repository.setAllowGuestsToControlPlayback(value)
+        }
+
+        suspend fun setRequireHostApprovalToJoin(value: Boolean) {
+            repository.setRequireHostApprovalToJoin(value)
+        }
+
+        suspend fun setLastJoinLink(value: String) {
+            repository.setLastJoinLink(value)
+        }
+
+        suspend fun setWelcomeShown(value: Boolean) {
+            repository.setWelcomeShown(value)
+        }
+
+        suspend fun setUseWebRtc(value: Boolean) {
+            repository.setUseWebRtc(value)
+        }
+    }
+
+class MusicTogetherSessionActionsUseCase
+    @Inject
+    constructor(
+        private val repository: MusicTogetherRepository,
+    ) {
+        fun startSession(
+            mode: MusicTogetherConnectionMode,
+            displayName: String,
+            port: Int,
+            settings: TogetherRoomSettings,
+            useWebRtc: Boolean = false,
+        ) {
+            repository.startSession(
+                mode = mode,
+                displayName = displayName,
+                port = port,
+                settings = settings,
+                useWebRtc = useWebRtc,
+            )
+        }
+
+        fun joinSession(
+            mode: MusicTogetherConnectionMode,
+            rawInput: String,
+            displayName: String,
+            useWebRtc: Boolean = false,
+        ) {
+            repository.joinSession(
+                mode = mode,
+                rawInput = rawInput,
+                displayName = displayName,
+                useWebRtc = useWebRtc,
+            )
+        }
+
+
+        fun startManualWebRtcHost(
+            displayName: String,
+            settings: TogetherRoomSettings,
+        ) {
+            repository.startSession(
+                mode = MusicTogetherConnectionMode.MANUAL_WEBRTC,
+                displayName = displayName,
+                port = 0,
+                settings = settings,
+            )
+        }
+
+        fun joinManualWebRtc(
+            displayName: String,
+        ) {
+            repository.joinSession(
+                mode = MusicTogetherConnectionMode.MANUAL_WEBRTC,
+                rawInput = "",
+                displayName = displayName,
+            )
+        }
+
+        fun leaveSession() {
+            repository.leaveSession()
+        }
+
+
+        suspend fun submitManualQrPackets(
+            packets: List<String>,
+        ) {
+            repository.submitManualQrPackets(packets)
+        }
+
+        suspend fun exportManualIce() {
+            repository.exportManualIce()
+        }
+
+
+        fun updateSettings(settings: TogetherRoomSettings) {
+            repository.updateSettings(settings)
+        }
+
+        fun approveParticipant(
+            participantId: String,
+            approved: Boolean,
+        ) {
+            repository.approveParticipant(participantId, approved)
+        }
+
+        fun kickParticipant(participantId: String) {
+            repository.kickParticipant(participantId)
+        }
+
+        fun banParticipant(participantId: String) {
+            repository.banParticipant(participantId)
+        }
+
+        fun transferHostOwnership(participantId: String) {
+            repository.transferHostOwnership(participantId)
+        }
+    }

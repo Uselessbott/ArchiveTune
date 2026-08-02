@@ -910,7 +910,7 @@ private fun ManualQrPacketCard(
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.width(170.dp),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -1055,7 +1055,7 @@ SectionCard(
                             index = page.index,
                             total = page.total,
                             bitmap = page.bitmap,
-                            modifier = Modifier.fillMaxWidth(0.48f),
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -1084,14 +1084,14 @@ SectionCard(
             ) {
                 OutlinedButton(
                     onClick = viewModel::exportPendingIce,
-                    modifier = Modifier.fillMaxWidth(0.48f),
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text("Export ICE")
                 }
 
                 OutlinedButton(
                     onClick = viewModel::clearQrPackets,
-                    modifier = Modifier.fillMaxWidth(0.48f),
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text("Clear")
                 }
@@ -1693,7 +1693,7 @@ private fun InstructionRow(
         horizontalArrangement = Arrangement.spacedBy(MusicTogetherSpacing.sm),
     ) {
         AccentIcon(iconResId = iconResId, accent = accent, size = 38.dp)
-        Column(modifier = Modifier.fillMaxWidth(0.48f), verticalArrangement = Arrangement.spacedBy(MusicTogetherSpacing.xxs)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MusicTogetherSpacing.xxs)) {
             Text(
                 text = stringResource(titleResId),
                 style = MaterialTheme.typography.titleSmall,

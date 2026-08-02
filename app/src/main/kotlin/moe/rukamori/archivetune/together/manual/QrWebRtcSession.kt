@@ -41,8 +41,6 @@ class QrWebRtcSession(
 
     private var lastImportedFingerprint: Int? = null
 
-
-
     private var iceCollectionJob: Job? = null
     private var connectionObserverJob: Job? = null
     private var pendingIceFlushJob: Job? = null
@@ -54,16 +52,30 @@ class QrWebRtcSession(
     private val seenRemoteIce = hashSetOf<String>()
     private val iceMutex = Mutex()
 
-
     private val _exchangeState =
         MutableStateFlow<QrExchangeState>(QrExchangeState.Idle)
 
     val exchangeState: StateFlow<QrExchangeState> =
         _exchangeState.asStateFlow()
 
+    // ---------- Host multi‑peer state (preparation) ----------
+    private enum class Role { HOST, GUEST }
+    private var role: Role? = null
 
+    private data class HostPeerSession(
+        val sessionId: String,
+        var remoteSessionId: String? = null,
+        var lastImportedFingerprint: Int? = null,
+        val pendingIceCandidates: MutableList<ManualIceCandidate> = mutableListOf(),
+        val seenRemoteIce: MutableSet<String> = mutableSetOf()
+    )
+    private val hostPeers = mutableMapOf<String, HostPeerSession>()
+    // TODO: Replace with one WebRtcTransport per HostPeerSession when the transport layer supports multiple PeerConnections.
+    private var activeHostPeer: HostPeerSession? = null
+    // Buffer ICE candidates that arrive before the peer is known
+    private val hostPendingIceBuffer = mutableListOf<ManualIceCandidate>()
+    // ---------------------------------------------------------
 
-    
     private fun observeConnectionState() {
         connectionObserverJob?.cancel()
 
@@ -96,7 +108,7 @@ class QrWebRtcSession(
         }
     }
 
-private fun startIceCollection() {
+    private fun startIceCollection() {
         iceCollectionJob?.cancel()
         connectionObserverJob?.cancel()
 
@@ -104,23 +116,33 @@ private fun startIceCollection() {
             transport.localIceCandidates.collect { dto ->
                 iceMutex.lock()
                 try {
-                    pendingIceCandidates += ManualIceCandidate(
+                    val candidate = ManualIceCandidate(
                         version = ManualQrProtocol.VERSION,
                         sessionId = sessionId,
                         candidate = dto,
                     )
 
+                    when (role) {
+                        Role.HOST -> {
+                            // If we have an active peer, add directly, otherwise buffer
+                            if (activeHostPeer != null) {
+                                activeHostPeer!!.pendingIceCandidates.add(candidate)
+                            } else {
+                                hostPendingIceBuffer.add(candidate)
+                            }
+                        }
+                        Role.GUEST -> {
+                            pendingIceCandidates += candidate
+                        }
+                        else -> { /* ignore */ }
+                    }
 
-                
-pendingIceFlushJob?.cancel()
-
-pendingIceFlushJob =
-    scope.launch {
-        kotlinx.coroutines.delay(750)
-        flushIceCandidates()
-    }
-
-
+                    pendingIceFlushJob?.cancel()
+                    pendingIceFlushJob =
+                        scope.launch {
+                            kotlinx.coroutines.delay(750)
+                            flushIceCandidates()
+                        }
                 } finally {
                     iceMutex.unlock()
                 }
@@ -130,6 +152,10 @@ pendingIceFlushJob =
 
 
     suspend fun startHost() {
+        role = Role.HOST
+        activeHostPeer = null
+        hostPeers.clear()
+        hostPendingIceBuffer.clear()
         _exchangeState.value = QrExchangeState.CreatingOffer
         transport.host()
         startIceCollection()
@@ -155,57 +181,85 @@ pendingIceFlushJob =
         val qrStrings = QrCodec.encode(fullPacket)
         _qrPackets.value = qrStrings
 
-        // Answer QR is immediately available.
         _exchangeState.value =
             QrExchangeState.WaitingForRemoteAnswer
     }
 
     suspend fun startGuest() {
+        role = Role.GUEST
         _exchangeState.value = QrExchangeState.WaitingForOffer
         transport.join()
         startIceCollection()
+        observeConnectionState()
     }
 
     suspend fun submitPackets(packets: List<String>) {
         try {
-        val currentState = _exchangeState.value
-        require(
-            currentState is QrExchangeState.WaitingForOffer ||
-            currentState is QrExchangeState.WaitingForRemoteAnswer
-        ) {
-            "Unexpected state: $currentState"
-        }
-
-        val fingerprint = packets.sorted().hashCode()
-
-        if (lastImportedFingerprint == fingerprint) {
-            return
-        }
-
-        lastImportedFingerprint = fingerprint
-
-        val signalPacket = QrCodec.decode(packets)
-        remoteSessionId = signalPacket.sessionId
-        _qrPackets.value = emptyList()
-        when (signalPacket.kind) {
-            QrSignalKind.OFFER -> {
-                require(currentState is QrExchangeState.WaitingForOffer) {
-                    "OFFER cannot be processed in state $currentState"
-                }
-                val offer = TogetherJson.json.decodeFromString<ManualOffer>(signalPacket.payload)
-                handleOffer(offer)
+            val currentState = _exchangeState.value
+            require(
+                currentState is QrExchangeState.WaitingForOffer ||
+                currentState is QrExchangeState.WaitingForRemoteAnswer
+            ) {
+                "Unexpected state: $currentState"
             }
-            QrSignalKind.ANSWER -> {
-                require(currentState is QrExchangeState.WaitingForRemoteAnswer) {
-                    "ANSWER cannot be processed in state $currentState"
+
+            val fingerprint = packets.sorted().hashCode()
+            val signalPacket = QrCodec.decode(packets)
+            val peerSessionId = signalPacket.sessionId
+
+            when (role) {
+                Role.HOST -> {
+                    val peer = hostPeers.getOrPut(peerSessionId) {
+                        HostPeerSession(peerSessionId)
+                    }
+                    if (peer.lastImportedFingerprint == fingerprint) {
+                        return
+                    }
+                    peer.lastImportedFingerprint = fingerprint
                 }
-                val answer = TogetherJson.json.decodeFromString<ManualAnswer>(signalPacket.payload)
-                handleAnswer(answer)
-            }
-            QrSignalKind.ICE -> {
-                handleIceBatch(signalPacket)
-            }
+                Role.GUEST -> {
+                    if (lastImportedFingerprint == fingerprint) {
+                        return
+                    }
+                    lastImportedFingerprint = fingerprint
+                    remoteSessionId = peerSessionId
                 }
+                null -> error("Session not started")
+            }
+
+            when (signalPacket.kind) {
+                QrSignalKind.OFFER -> {
+                    if (role == Role.HOST) {
+                        error("Host received OFFER")
+                    } else {
+                        val offer = TogetherJson.json.decodeFromString<ManualOffer>(signalPacket.payload)
+                        handleOffer(offer)
+                    }
+                }
+                QrSignalKind.ANSWER -> {
+                    if (role == Role.HOST) {
+                        // Only accept the first answer; reject others to preserve single‑peer behaviour
+                        if (activeHostPeer == null) {
+                            val answer = TogetherJson.json.decodeFromString<ManualAnswer>(signalPacket.payload)
+                            handleAnswer(answer, peerSessionId)
+                        } else {
+                            // TODO: future multi‑peer will need separate transports
+                            // Ignore additional answers for now
+                            return
+                        }
+                    } else {
+                        val answer = TogetherJson.json.decodeFromString<ManualAnswer>(signalPacket.payload)
+                        handleAnswer(answer)
+                    }
+                }
+                QrSignalKind.ICE -> {
+                    if (role == Role.HOST) {
+                        handleIceBatchHost(signalPacket)
+                    } else {
+                        handleIceBatch(signalPacket)
+                    }
+                }
+            }
         } catch (t: Throwable) {
             _exchangeState.value =
                 QrExchangeState.Failed(
@@ -214,36 +268,82 @@ pendingIceFlushJob =
         }
     }
 
-    
-
     suspend fun exportPendingIce() {
-        val batch = iceMutex.withLock {
-            if (pendingIceCandidates.isEmpty()) return
+        when (role) {
+            Role.HOST -> {
+                val peer = activeHostPeer ?: return
+                val batch = ManualIceCandidateBatch(
+                    sessionId = sessionId,
+                    candidates = peer.pendingIceCandidates.toList()
+                )
+                if (batch.candidates.isEmpty()) return
+                val json = TogetherJson.json.encodeToString(batch)
+                peer.pendingIceCandidates.clear()
+                val packet = QrSignalPacket(
+                    version = ManualQrProtocol.VERSION,
+                    sessionId = batch.sessionId,
+                    kind = QrSignalKind.ICE,
+                    part = REASSEMBLED_PART,
+                    total = ManualQrProtocol.QR_COUNT,
+                    payload = json,
+                )
+                _qrPackets.value = QrCodec.encode(packet)
+            }
+            Role.GUEST -> {
+                val batch = iceMutex.withLock {
+                    if (pendingIceCandidates.isEmpty()) return
+                    ManualIceCandidateBatch(
+                        sessionId = remoteSessionId ?: sessionId,
+                        candidates = pendingIceCandidates.toList(),
+                    )
+                }
 
-            ManualIceCandidateBatch(
-                sessionId = remoteSessionId ?: sessionId,
-                candidates = pendingIceCandidates.toList(),
-            )
+                val json = TogetherJson.json.encodeToString(batch)
+
+                iceMutex.withLock {
+                    pendingIceCandidates.clear()
+                }
+
+                val packet = QrSignalPacket(
+                    version = ManualQrProtocol.VERSION,
+                    sessionId = batch.sessionId,
+                    kind = QrSignalKind.ICE,
+                    part = REASSEMBLED_PART,
+                    total = ManualQrProtocol.QR_COUNT,
+                    payload = json,
+                )
+
+                _qrPackets.value = QrCodec.encode(packet)
+            }
+            else -> { /* ignore */ }
         }
-
-        val json = TogetherJson.json.encodeToString(batch)
-
-        iceMutex.withLock {
-            pendingIceCandidates.clear()
-        }
-
-        val packet = QrSignalPacket(
-            version = ManualQrProtocol.VERSION,
-            sessionId = batch.sessionId,
-            kind = QrSignalKind.ICE,
-            part = REASSEMBLED_PART,
-            total = ManualQrProtocol.QR_COUNT,
-            payload = json,
-        )
-
-        _qrPackets.value = QrCodec.encode(packet)
     }
 
+    private suspend fun handleIceBatchHost(packet: QrSignalPacket) {
+        val batch =
+            TogetherJson.json.decodeFromString<ManualIceCandidateBatch>(
+                packet.payload,
+            )
+
+        val peer = hostPeers[packet.sessionId]
+        // Only process ICE if this is the active peer
+        if (peer == null || peer != activeHostPeer) {
+            return
+        }
+
+        batch.candidates.forEach { candidate ->
+            val key = buildString {
+                append(candidate.candidate.sdpMid)
+                append(':')
+                append(candidate.candidate.sdpMLineIndex)
+                append(':')
+                append(candidate.candidate.candidate)
+            }
+            if (peer.seenRemoteIce.add(key)) {
+                transport.addRemoteIceCandidate(candidate.candidate)
+            }
+        }
+    }
 
     private suspend fun handleIceBatch(packet: QrSignalPacket) {
         val batch =
@@ -258,12 +358,20 @@ pendingIceFlushJob =
         }
 
         batch.candidates.forEach {
-            transport.addRemoteIceCandidate(it.candidate)
+            val key = buildString {
+                append(it.candidate.sdpMid)
+                append(':')
+                append(it.candidate.sdpMLineIndex)
+                append(':')
+                append(it.candidate.candidate)
+            }
+            if (seenRemoteIce.add(key)) {
+                transport.addRemoteIceCandidate(it.candidate)
+            }
         }
     }
 
-
-private fun sdpTypeFromString(type: String): SessionDescription.Type {
+    private fun sdpTypeFromString(type: String): SessionDescription.Type {
         return when (type.lowercase()) {
             "offer" -> SessionDescription.Type.OFFER
             "answer" -> SessionDescription.Type.ANSWER
@@ -313,24 +421,61 @@ private fun sdpTypeFromString(type: String): SessionDescription.Type {
 
     suspend fun handleAnswer(
         answer: ManualAnswer,
+        peerSessionId: String,
     ) {
+        // Host side: only one active peer supported
+        val peer = hostPeers.getOrPut(peerSessionId) {
+            HostPeerSession(peerSessionId)
+        }
+        activeHostPeer = peer
+        peer.remoteSessionId = peerSessionId
+
+        // Assign any buffered ICE candidates to this peer
+        if (hostPendingIceBuffer.isNotEmpty()) {
+            peer.pendingIceCandidates.addAll(hostPendingIceBuffer)
+            hostPendingIceBuffer.clear()
+        }
+
         transport.setRemoteDescription(SessionDescription(sdpTypeFromString(answer.type), answer.sdp))
         _exchangeState.value = QrExchangeState.Connecting
     }
 
+    suspend fun handleAnswer(
+        answer: ManualAnswer,
+    ) {
+        // Guest side: single peer
+        transport.setRemoteDescription(SessionDescription(sdpTypeFromString(answer.type), answer.sdp))
+        _exchangeState.value = QrExchangeState.Connecting
+    }
 
     private suspend fun flushIceCandidates() {
         iceMutex.lock()
         try {
-            if (pendingIceCandidates.isEmpty()) return
+            val candidates = when (role) {
+                Role.HOST -> {
+                    val peer = activeHostPeer ?: return
+                    peer.pendingIceCandidates
+                }
+                Role.GUEST -> pendingIceCandidates
+                else -> return
+            }
+            if (candidates.isEmpty()) return
 
             val batch = ManualIceCandidateBatch(
                 version = ManualQrProtocol.VERSION,
                 sessionId = sessionId,
-                candidates = pendingIceCandidates.toList()
+                candidates = candidates.toList()
             )
 
             val json = TogetherJson.json.encodeToString(batch)
+
+            when (role) {
+                Role.HOST -> {
+                    activeHostPeer?.pendingIceCandidates?.clear()
+                }
+                Role.GUEST -> pendingIceCandidates.clear()
+                else -> { /* ignore */ }
+            }
 
             val packet = QrSignalPacket(
                 version = ManualQrProtocol.VERSION,
@@ -343,13 +488,10 @@ private fun sdpTypeFromString(type: String): SessionDescription.Type {
 
             _qrPackets.value = QrCodec.encode(packet)
 
-            pendingIceCandidates.clear()
-
         } finally {
             iceMutex.unlock()
         }
     }
-
 
     suspend fun handleIce(
         candidate: ManualIceCandidate,
@@ -363,28 +505,46 @@ private fun sdpTypeFromString(type: String): SessionDescription.Type {
                 append(candidate.candidate.candidate)
             }
 
-        if (!seenRemoteIce.add(key)) {
-            return
+        // Use appropriate seen set based on role
+        when (role) {
+            Role.HOST -> {
+                val peer = activeHostPeer ?: return
+                if (!peer.seenRemoteIce.add(key)) {
+                    return
+                }
+            }
+            Role.GUEST -> {
+                if (!seenRemoteIce.add(key)) {
+                    return
+                }
+            }
+            else -> return
         }
 
         transport.addRemoteIceCandidate(candidate.candidate)
     }
 
     fun resetManualQrSession() {
-        pendingIceCandidates.clear()
-        seenRemoteIce.clear()
-        remoteSessionId = null
-        _qrPackets.value = emptyList()
-        _exchangeState.value = QrExchangeState.Idle
-    }
-
-
-
-    private fun cleanupAfterSuccessfulConnection() {
+        role = null
         pendingIceCandidates.clear()
         seenRemoteIce.clear()
         remoteSessionId = null
         lastImportedFingerprint = null
+        hostPeers.clear()
+        activeHostPeer = null
+        hostPendingIceBuffer.clear()
+        _qrPackets.value = emptyList()
+        _exchangeState.value = QrExchangeState.Idle
+    }
+
+    private fun cleanupAfterSuccessfulConnection() {
+        // Guest only: clear local state; host keeps its peer state for potential reuse
+        if (role == Role.GUEST) {
+            pendingIceCandidates.clear()
+            seenRemoteIce.clear()
+            remoteSessionId = null
+            lastImportedFingerprint = null
+        }
         _qrPackets.value = emptyList()
     }
 
@@ -399,5 +559,9 @@ private fun sdpTypeFromString(type: String): SessionDescription.Type {
         seenRemoteIce.clear()
         remoteSessionId = null
         lastImportedFingerprint = null
+        hostPeers.values.forEach { it.pendingIceCandidates.clear() }
+        hostPeers.clear()
+        activeHostPeer = null
+        hostPendingIceBuffer.clear()
     }
 }

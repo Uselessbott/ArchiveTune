@@ -742,18 +742,12 @@ class MusicService :
 
     private var qrSession: QrWebRtcSession? = null
 
-    private val _qrPackets =
-        kotlinx.coroutines.flow.MutableStateFlow<List<String>>(emptyList())
-    val qrPackets: kotlinx.coroutines.flow.StateFlow<List<String>> =
-        _qrPackets.asStateFlow()
 
-    private val _qrExchangeState =
-        kotlinx.coroutines.flow.MutableStateFlow<moe.rukamori.archivetune.together.manual.QrExchangeState>(
-            moe.rukamori.archivetune.together.manual.QrExchangeState.Idle
-        )
-    val qrExchangeState:
-        kotlinx.coroutines.flow.StateFlow<moe.rukamori.archivetune.together.manual.QrExchangeState> =
-        _qrExchangeState.asStateFlow()
+    val qrPackets
+        get() = qrSession?.qrPackets
+
+    val qrExchangeState
+        get() = qrSession?.exchangeState
 
 
 
@@ -5900,18 +5894,12 @@ class MusicService :
             storedJoinDisplayName = displayName
 
             if (qrSession == null) {
-                qrSession =
-                    QrWebRtcSession {
-                        WebRtcTransport(
-                            applicationContext
-                        )
-                    }
+                qrSession = QrWebRtcSession(webRtcTransport)
+            } else {
+                qrSession!!.resetManualQrSession()
             }
 
-            qrSession!!.resetManualQrSession()
-
             qrSession!!.startHost()
-            attachQrSessionObservers()
 
             _manualQrState.value = ManualQrState.HostReadyToGenerate
 
@@ -5924,25 +5912,7 @@ class MusicService :
         }
     }
 
-    
-
-    private fun attachQrSessionObservers() {
-        val session = qrSession ?: return
-
-        ioScope.launch(SilentHandler) {
-            session.qrPackets.collect {
-                _qrPackets.value = it
-            }
-        }
-
-        ioScope.launch(SilentHandler) {
-            session.exchangeState.collect {
-                _qrExchangeState.value = it
-            }
-        }
-    }
-
-fun joinTogetherManualWebRtc(
+    fun joinTogetherManualWebRtc(
         displayName: String,
     ) {
         manualDisconnectRequested = false
@@ -5957,18 +5927,12 @@ fun joinTogetherManualWebRtc(
             storedJoinDisplayName = displayName
 
             if (qrSession == null) {
-                qrSession =
-                    QrWebRtcSession {
-                        WebRtcTransport(
-                            applicationContext
-                        )
-                    }
+                qrSession = QrWebRtcSession(webRtcTransport)
+            } else {
+                qrSession!!.resetManualQrSession()
             }
 
-            qrSession!!.resetManualQrSession()
-
             qrSession!!.startGuest()
-            attachQrSessionObservers()
 
             _manualQrState.value = ManualQrState.GuestReadyToImport
 
