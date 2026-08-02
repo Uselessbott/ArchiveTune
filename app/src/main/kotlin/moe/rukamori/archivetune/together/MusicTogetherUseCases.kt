@@ -116,6 +116,29 @@ class MusicTogetherSessionActionsUseCase
             )
         }
 
+
+        fun startManualWebRtcHost(
+            displayName: String,
+            settings: TogetherRoomSettings,
+        ) {
+            repository.startSession(
+                mode = MusicTogetherConnectionMode.MANUAL_WEBRTC,
+                displayName = displayName,
+                port = 0,
+                settings = settings,
+            )
+        }
+
+        fun joinManualWebRtc(
+            displayName: String,
+        ) {
+            repository.joinSession(
+                mode = MusicTogetherConnectionMode.MANUAL_WEBRTC,
+                rawInput = "",
+                displayName = displayName,
+            )
+        }
+
         fun leaveSession() {
             repository.leaveSession()
         }

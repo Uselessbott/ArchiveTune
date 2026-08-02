@@ -711,7 +711,7 @@ class MusicTogetherViewModel
                     onlineMode = joinMode == MusicTogetherTransportMode.ONLINE,
                     useWebRtc = joinMode == MusicTogetherTransportMode.MANUAL_WEBRTC,
                     input = joinInput,
-                    hintResId = if (joinOnline) R.string.together_join_code_hint else R.string.together_join_link_hint,
+                    hintResId = if (joinMode == MusicTogetherTransportMode.ONLINE) R.string.together_join_code_hint else R.string.together_join_link_hint,
                     canJoin = canJoin && !disableJoinUi && !isJoining && !isJoinedAsAcceptedGuest && !isWaitingApproval,
                     disabled = disableJoinUi,
                     joined = isJoinedAsAcceptedGuest,
