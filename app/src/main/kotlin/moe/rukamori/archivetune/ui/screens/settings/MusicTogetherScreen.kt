@@ -22,6 +22,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -122,9 +123,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.remember
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.OutlinedButton
 
@@ -1030,22 +1028,20 @@ SectionCard(
 
                 Spacer(Modifier.height(12.dp))
 
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    maxItemsInEachRow = 2,
                 ) {
-                    items(
-                        count = model.manualQr.pages.size,
-                        key = { it },
-                    ) { index ->
+                    model.manualQr.pages.forEach { page ->
                         ManualQrPacketCard(
-                            index = index,
-                            total = model.manualQr.pages.size,
-                            bitmap = qrBitmaps[index],
+                            index = page.index,
+                            total = page.total,
+                            bitmap = page.bitmap,
                         )
                     }
+                }
                 }
 
             } else {
