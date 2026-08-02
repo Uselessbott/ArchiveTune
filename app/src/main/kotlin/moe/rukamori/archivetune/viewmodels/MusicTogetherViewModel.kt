@@ -259,8 +259,8 @@ class MusicTogetherViewModel
 
         private data class StateInputs(
             val snapshot: MusicTogetherSnapshot,
-            val hostOnline: Boolean,
-            val joinOnline: Boolean,
+            val hostMode: MusicTogetherTransportMode,
+            val joinMode: MusicTogetherTransportMode,
             val dialogState: MusicTogetherDialogUiState,
             val welcomeDismissed: Boolean,
         )
@@ -292,15 +292,15 @@ class MusicTogetherViewModel
         val state: StateFlow<MusicTogetherScreenState> =
             combine(
                 snapshots,
-                hostModeOnline,
-                joinModeOnline,
+                hostMode,
+                joinMode,
                 dialog,
                 welcomeDismissedThisSession,
-            ) { snapshot, hostOnline, joinOnline, dialogState, welcomeDismissed ->
+            ) { snapshot, hostMode, joinMode, dialogState, welcomeDismissed ->
                 StateInputs(
                     snapshot = snapshot,
-                    hostOnline = hostOnline,
-                    joinOnline = joinOnline,
+                    hostMode = hostMode,
+                    joinMode = joinMode,
                     dialogState = dialogState,
                     welcomeDismissed = welcomeDismissed,
                 )
@@ -309,8 +309,8 @@ class MusicTogetherViewModel
                     val screenState: MusicTogetherScreenState =
                         MusicTogetherScreenState.Success(
                             stateInputs.snapshot.toUiModel(
-                                hostOnline = stateInputs.hostOnline,
-                                joinOnline = stateInputs.joinOnline,
+                                hostMode = stateInputs.hostMode,
+                                joinMode = stateInputs.joinMode,
                                 dialogState = stateInputs.dialogState,
                                 welcomeDismissed = stateInputs.welcomeDismissed,
                                 dontShowAgain = dontShowAgain,
@@ -418,14 +418,14 @@ class MusicTogetherViewModel
             dialog.value = MusicTogetherDialogUiState.None
         }
 
-        fun setHostModeOnline(value: Boolean) {
-            hostModeOnline.value = value
+        fun setHostMode(mode: MusicTogetherTransportMode) {
+            hostMode.value = mode
         }
 
-        fun setJoinModeOnline(value: Boolean) {
+        fun setJoinMode(mode: MusicTogetherTransportMode) {
             val model = successModel()
             if (model?.join?.disabled == true) return
-            joinModeOnline.value = value
+            joinMode.value = mode
         }
 
         fun setAllowGuestsToAddTracks(value: Boolean) {
