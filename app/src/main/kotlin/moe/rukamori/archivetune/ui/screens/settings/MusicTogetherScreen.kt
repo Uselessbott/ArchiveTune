@@ -112,6 +112,7 @@ import moe.rukamori.archivetune.viewmodels.MusicTogetherScreenState
 import moe.rukamori.archivetune.viewmodels.MusicTogetherSessionShareUiModel
 import moe.rukamori.archivetune.viewmodels.MusicTogetherStatusUiModel
 import moe.rukamori.archivetune.viewmodels.MusicTogetherUiModel
+import moe.rukamori.archivetune.viewmodels.MusicTogetherTransportMode
 import moe.rukamori.archivetune.viewmodels.MusicTogetherViewModel
 import moe.rukamori.archivetune.ui.component.IconButton as AtIconButton
 
@@ -704,20 +705,28 @@ private fun HostControlsCard(
     ) {
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             SegmentedButton(
-                selected = !host.onlineMode,
-                onClick = { viewModel.setHostModeOnline(false) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                selected = !host.onlineMode && !host.useWebRtc,
+                onClick = { viewModel.setHostMode(MusicTogetherTransportMode.LAN) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
                 icon = {},
             ) {
                 Text(text = stringResource(R.string.together_lan))
             }
             SegmentedButton(
                 selected = host.onlineMode,
-                onClick = { viewModel.setHostModeOnline(true) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                onClick = { viewModel.setHostMode(MusicTogetherTransportMode.ONLINE) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
                 icon = {},
             ) {
                 Text(text = stringResource(R.string.together_online))
+            }
+            SegmentedButton(
+                selected = host.useWebRtc,
+                onClick = { viewModel.setHostMode(MusicTogetherTransportMode.MANUAL_WEBRTC) },
+                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                icon = {},
+            ) {
+                Text("QR")
             }
         }
         SettingsRow(
@@ -751,14 +760,6 @@ private fun HostControlsCard(
             titleResId = R.string.together_require_approval,
             checked = host.requireHostApprovalToJoin,
             onCheckedChange = viewModel::setRequireHostApprovalToJoin,
-        )
-
-
-        ToggleRow(
-            iconResId = R.drawable.link,
-            titleResId = R.string.together_online,
-            checked = host.useWebRtc,
-            onCheckedChange = viewModel::setUseWebRtc,
         )
 
         Button(
@@ -800,10 +801,10 @@ private fun JoinControlsCard(
     ) {
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             SegmentedButton(
-                selected = !join.onlineMode,
+                selected = !join.onlineMode && !join.useWebRtc,
                 enabled = !join.disabled,
-                onClick = { viewModel.setJoinModeOnline(false) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                onClick = { viewModel.setJoinMode(MusicTogetherTransportMode.LAN) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
                 icon = {},
             ) {
                 Text(text = stringResource(R.string.together_join_link))
@@ -811,11 +812,20 @@ private fun JoinControlsCard(
             SegmentedButton(
                 selected = join.onlineMode,
                 enabled = !join.disabled,
-                onClick = { viewModel.setJoinModeOnline(true) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                onClick = { viewModel.setJoinMode(MusicTogetherTransportMode.ONLINE) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
                 icon = {},
             ) {
                 Text(text = stringResource(R.string.together_join_code))
+            }
+            SegmentedButton(
+                selected = join.useWebRtc,
+                enabled = !join.disabled,
+                onClick = { viewModel.setJoinMode(MusicTogetherTransportMode.MANUAL_WEBRTC) },
+                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                icon = {},
+            ) {
+                Text("QR")
             }
         }
         SettingsRow(

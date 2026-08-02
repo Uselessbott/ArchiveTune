@@ -63,6 +63,13 @@ sealed interface MusicTogetherScreenState {
 }
 
 @Immutable
+
+enum class MusicTogetherTransportMode {
+    LAN,
+    ONLINE,
+    MANUAL_WEBRTC,
+}
+
 data class MusicTogetherUiModel(
     val showWelcomeDialog: Boolean,
     val welcomeDontShowAgain: Boolean,
@@ -235,8 +242,8 @@ class MusicTogetherViewModel
         private val updatePreferences: UpdateMusicTogetherPreferencesUseCase,
         private val sessionActions: MusicTogetherSessionActionsUseCase,
     ) : ViewModel() {
-        private val hostModeOnline = MutableStateFlow(false)
-        private val joinModeOnline = MutableStateFlow(false)
+        private val hostMode = MutableStateFlow(MusicTogetherTransportMode.LAN)
+        private val joinMode = MutableStateFlow(MusicTogetherTransportMode.LAN)
         private val dialog = MutableStateFlow<MusicTogetherDialogUiState>(MusicTogetherDialogUiState.None)
         private val welcomeDismissedThisSession = MutableStateFlow(false)
         private val welcomeDontShowAgain = MutableStateFlow(true)
@@ -453,23 +460,55 @@ class MusicTogetherViewModel
         fun startSession() {
             val model = successModel() ?: return
             if (!model.host.startEnabled) return
-            sessionActions.startSession(
-                mode = if (model.host.onlineMode) MusicTogetherConnectionMode.ONLINE else MusicTogetherConnectionMode.LAN,
-                displayName = model.host.displayName,
-                port = model.host.port,
-                settings =
-                    TogetherRoomSettings(
-                        allowGuestsToAddTracks = model.host.allowGuestsToAddTracks,
-                        allowGuestsToControlPlayback = model.host.allowGuestsToControlPlayback,
-                        requireHostApprovalToJoin = model.host.requireHostApprovalToJoin,
-                    ),
-            )
+
+            val settings =
+                TogetherRoomSettings(
+                    allowGuestsToAddTracks = model.host.allowGuestsToAddTracks,
+                    allowGuestsToControlPlayback = model.host.allowGuestsToControlPlayback,
+                    requireHostApprovalToJoin = model.host.requireHostApprovalToJoin,
+                )
+
+            when (hostMode.value) {
+                MusicTogetherTransportMode.LAN ->
+                    sessionActions.startSession(
+                        mode = MusicTogetherConnectionMode.LAN,
+                        displayName = model.host.displayName,
+                        port = model.host.port,
+                        settings = settings,
+                    )
+
+                MusicTogetherTransportMode.ONLINE ->
+                    sessionActions.startSession(
+                        mode = MusicTogetherConnectionMode.ONLINE,
+                        displayName = model.host.displayName,
+                        port = model.host.port,
+                        settings = settings,
+                    )
+
+                MusicTogetherTransportMode.MANUAL_WEBRTC ->
+                    sessionActions.startManualWebRtcHost(
+                        displayName = model.host.displayName,
+                        settings = settings,
+                    )
+            }
         }
 
         fun joinSession() {
             val model = successModel() ?: return
             if (!model.join.canJoin) return
-            submitJoinInput(model.join.input)
+
+            when (joinMode.value) {
+                MusicTogetherTransportMode.LAN,
+                MusicTogetherTransportMode.ONLINE -> {
+                    submitJoinInput(model.join.input)
+                }
+
+                MusicTogetherTransportMode.MANUAL_WEBRTC -> {
+                    sessionActions.joinManualWebRtc(
+                        displayName = model.host.displayName,
+                    )
+                }
+            }
         }
 
         fun leaveSession() {
@@ -545,8 +584,8 @@ class MusicTogetherViewModel
         }
 
         private fun MusicTogetherSnapshot.toUiModel(
-            hostOnline: Boolean,
-            joinOnline: Boolean,
+            hostMode: MusicTogetherTransportMode,
+            joinMode: MusicTogetherTransportMode,
             dialogState: MusicTogetherDialogUiState,
             welcomeDismissed: Boolean,
             dontShowAgain: Boolean,
@@ -649,28 +688,28 @@ class MusicTogetherViewModel
             val playback = roomState.toPlaybackUiModel()
             val host =
                 MusicTogetherHostUiModel(
-                    onlineMode = hostOnline,
+                    onlineMode = hostMode == MusicTogetherTransportMode.ONLINE,
+                    useWebRtc = hostMode == MusicTogetherTransportMode.MANUAL_WEBRTC,
                     displayName = preferences.displayName,
                     port = preferences.port,
                     allowGuestsToAddTracks = preferences.allowGuestsToAddTracks,
                     allowGuestsToControlPlayback = preferences.allowGuestsToControlPlayback,
                     requireHostApprovalToJoin = preferences.requireHostApprovalToJoin,
-                    useWebRtc = preferences.useWebRtc,
                     visible = !isJoinedAsGuest,
                     startEnabled = !isCreatingSessionLoading && !isJoining && !isHosting && state !is TogetherSessionState.Joined,
                     loading = isCreatingSessionLoading,
                 )
             val joinInput = preferences.lastJoinLink
             val canJoin =
-                if (joinOnline) {
+                if (joinMode == MusicTogetherTransportMode.ONLINE) {
                     joinInput.trim().isNotBlank()
                 } else {
                     TogetherLink.decode(joinInput) != null
                 }
             val join =
                 MusicTogetherJoinUiModel(
-                    onlineMode = joinOnline,
-                    useWebRtc = preferences.useWebRtc,
+                    onlineMode = joinMode == MusicTogetherTransportMode.ONLINE,
+                    useWebRtc = joinMode == MusicTogetherTransportMode.MANUAL_WEBRTC,
                     input = joinInput,
                     hintResId = if (joinOnline) R.string.together_join_code_hint else R.string.together_join_link_hint,
                     canJoin = canJoin && !disableJoinUi && !isJoining && !isJoinedAsAcceptedGuest && !isWaitingApproval,
