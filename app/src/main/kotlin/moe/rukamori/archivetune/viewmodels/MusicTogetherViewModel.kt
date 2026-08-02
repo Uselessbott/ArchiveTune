@@ -208,6 +208,7 @@ data class ManualQrPageUiModel(
 @Immutable
 data class ManualQrUiModel(
     val visible: Boolean,
+    val manualState: moe.rukamori.archivetune.together.ManualQrState,
     val state: moe.rukamori.archivetune.together.manual.QrExchangeState,
     val pages: List<ManualQrPageUiModel>,
 )
@@ -298,6 +299,7 @@ class MusicTogetherViewModel
                                     useWebRtc = false,
                                 ),
                             sessionState = TogetherSessionState.Error(message = throwable.message.orEmpty()),
+                            manualQrState = moe.rukamori.archivetune.together.ManualQrState.Idle,
                             qrExchangeState = moe.rukamori.archivetune.together.manual.QrExchangeState.Idle,
                             qrPackets = emptyList(),
                         ),
@@ -768,6 +770,7 @@ class MusicTogetherViewModel
                 manualQr =
                     ManualQrUiModel(
                         visible = host.useWebRtc || join.useWebRtc,
+                        manualState = manualQrState,
                         state = qrExchangeState,
                         pages =
                             qrPackets.mapIndexed { index, packet ->

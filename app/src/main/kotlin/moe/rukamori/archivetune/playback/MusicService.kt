@@ -5893,7 +5893,11 @@ class MusicService :
             togetherIsOnlineSession = false
             storedJoinDisplayName = displayName
 
-            if (qrSession == null) qrSession = QrWebRtcSession(webRtcTransport)
+            if (qrSession == null) {
+                qrSession = QrWebRtcSession(webRtcTransport)
+            } else {
+                qrSession!!.resetManualQrSession()
+            }
 
             qrSession!!.startHost()
 
@@ -5922,7 +5926,11 @@ class MusicService :
             togetherIsOnlineSession = false
             storedJoinDisplayName = displayName
 
-            if (qrSession == null) qrSession = QrWebRtcSession(webRtcTransport)
+            if (qrSession == null) {
+                qrSession = QrWebRtcSession(webRtcTransport)
+            } else {
+                qrSession!!.resetManualQrSession()
+            }
 
             qrSession!!.startGuest()
 
@@ -5982,6 +5990,7 @@ class MusicService :
         }
         togetherServer = null
 
+        qrSession?.resetManualQrSession()
         _manualQrState.value = ManualQrState.Idle
         // Phase 2:
         // manualQrSession = null

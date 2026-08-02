@@ -31,12 +31,14 @@ class ObserveMusicTogetherStateUseCase
             combine(
                 repository.preferences,
                 repository.sessionState,
+                repository.manualQrState,
                 repository.manualQrExchangeState,
                 repository.manualQrPackets,
-            ) { preferences, sessionState, qrExchangeState, qrPackets ->
+            ) { preferences, sessionState, manualQrState, qrExchangeState, qrPackets ->
                 MusicTogetherSnapshot(
                     preferences = preferences,
                     sessionState = sessionState,
+                    manualQrState = manualQrState,
                     qrExchangeState = qrExchangeState,
                     qrPackets = qrPackets,
                 )

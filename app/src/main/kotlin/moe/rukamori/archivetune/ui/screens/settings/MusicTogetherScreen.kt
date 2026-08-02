@@ -978,10 +978,17 @@ SectionCard(
         iconResId = R.drawable.link,
         titleResId = R.string.join_session,
         subtitle =
-            if (model.host.useWebRtc)
-                "Manual QR Host"
-            else
-                "Manual QR Join",
+            when (model.manualQr.manualState) {
+                ManualQrState.HostReadyToGenerate,
+                ManualQrState.ShowingOfferQr,
+                ManualQrState.ShowingAnswerQr,
+                ManualQrState.ExchangingIce -> "Manual QR Host"
+
+                ManualQrState.GuestReadyToImport -> "Manual QR Join"
+
+                ManualQrState.Idle ->
+                    if (model.host.useWebRtc) "Manual QR Host" else "Manual QR Join"
+            },
         accent = MaterialTheme.colorScheme.primary,
     ) {
         Column(
@@ -1021,6 +1028,13 @@ SectionCard(
 
             
 
+            if (
+                model.manualQr.manualState == ManualQrState.HostReadyToGenerate ||
+                model.manualQr.manualState == ManualQrState.ShowingOfferQr ||
+                model.manualQr.manualState == ManualQrState.ShowingAnswerQr ||
+                model.manualQr.manualState == ManualQrState.ExchangingIce
+            ) {
+
                 Text(
                     text = "Generated QR codes: ${model.manualQr.pages.size}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -1039,7 +1053,7 @@ SectionCard(
                             index = page.index,
                             total = page.total,
                             bitmap = page.bitmap,
-                            modifier = Modifier.fillMaxWidth(0.48f),
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -1051,6 +1065,13 @@ SectionCard(
                     style = MaterialTheme.typography.bodyMedium,
                 )
 
+            }
+
+            FilledTonalButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = viewModel::leaveSession,
+            ) {
+                Text("Stop Session")
             }
 
             Spacer(Modifier.height(12.dp))

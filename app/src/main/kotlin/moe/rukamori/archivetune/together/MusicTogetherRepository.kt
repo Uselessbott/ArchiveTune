@@ -53,6 +53,7 @@ data class MusicTogetherPreferences(
 data class MusicTogetherSnapshot(
     val preferences: MusicTogetherPreferences,
     val sessionState: TogetherSessionState,
+    val manualQrState: moe.rukamori.archivetune.together.ManualQrState,
     val qrExchangeState: moe.rukamori.archivetune.together.manual.QrExchangeState,
     val qrPackets: List<String>,
 )
@@ -64,6 +65,16 @@ class MusicTogetherRepository
         @ApplicationContext private val context: Context,
     ) {
         private val serviceFlow = MutableStateFlow<MusicService?>(null)
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val manualQrState =
+        serviceFlow.flatMapLatest {
+            it?.manualQrState
+                ?: kotlinx.coroutines.flow.flowOf(
+                    moe.rukamori.archivetune.together.ManualQrState.Idle
+                )
+        }
+
 
         val preferences: Flow<MusicTogetherPreferences> =
             context.dataStore.data
