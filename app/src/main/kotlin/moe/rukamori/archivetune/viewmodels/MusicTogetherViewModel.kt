@@ -765,8 +765,21 @@ class MusicTogetherViewModel
                 join = join,
                 participants = participantModels,
                 activityLog = log,
-                qrExchangeState = qrExchangeState,
-                qrPackets = qrPackets,
+                manualQr =
+                    ManualQrUiModel(
+                        visible = host.useWebRtc || join.useWebRtc,
+                        state = qrExchangeState,
+                        pages =
+                            qrPackets.mapIndexed { index, packet ->
+                                ManualQrPageUiModel(
+                                    index = index,
+                                    total = qrPackets.size,
+                                    bitmap =
+                                        moe.rukamori.archivetune.together.manual.QrBitmapGenerator
+                                            .generate(packet),
+                                )
+                            },
+                    ),
             )
         }
 
@@ -1005,13 +1018,13 @@ class MusicTogetherViewModel
             packets: List<String>,
         ) {
             viewModelScope.launch {
-                repository.submitManualQrPackets(packets)
+                sessionActions.submitManualQrPackets(packets)
             }
         }
 
         fun exportPendingIce() {
             viewModelScope.launch {
-                repository.exportManualIce()
+                sessionActions.exportManualIce()
             }
         }
 
@@ -1030,7 +1043,7 @@ class MusicTogetherViewModel
                             .importPackets(context, uri)
 
                     if (packets.isNotEmpty()) {
-                        repository.submitManualQrPackets(packets)
+                        sessionActions.submitManualQrPackets(packets)
                     }
                 }
             }

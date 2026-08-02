@@ -950,8 +950,8 @@ private fun ManualQrSection(
     val bringIntoViewRequester =
         remember { BringIntoViewRequester() }
 
-    LaunchedEffect(model.qrPackets.size) {
-        if (model.qrPackets.isNotEmpty()) {
+    LaunchedEffect(model.manualQr.pages.size) {
+        if (model.manualQr.pages.isNotEmpty()) {
             bringIntoViewRequester.bringIntoView()
         }
     }
@@ -970,7 +970,7 @@ private fun ManualQrSection(
 
 
     val qrBitmaps =
-        remember(model.qrPackets) {
+        remember(model.manualQr.pages) {
             model.qrPackets.map {
                 moe.rukamori.archivetune.together.manual.QrBitmapGenerator.generate(it)
             }
@@ -1000,7 +1000,7 @@ SectionCard(
 
             
             Text(
-                text = model.qrExchangeState.toString(),
+                text = model.manualQr.state.toString(),
                 style = MaterialTheme.typography.bodyMedium,
             )
 
@@ -1025,7 +1025,7 @@ SectionCard(
             if (model.host.useWebRtc) {
 
                 Text(
-                    text = "Generated QR codes: ${model.qrPackets.size}",
+                    text = "Generated QR codes: ${model.manualQr.pages.size}",
                     style = MaterialTheme.typography.bodyMedium,
                 )
 
@@ -1038,12 +1038,12 @@ SectionCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(
-                        count = model.qrPackets.size,
+                        count = model.manualQr.pages.size,
                         key = { it },
                     ) { index ->
                         ManualQrPacketCard(
                             index = index,
-                            total = model.qrPackets.size,
+                            total = model.manualQr.pages.size,
                             bitmap = qrBitmaps[index],
                         )
                     }
@@ -1082,9 +1082,9 @@ SectionCard(
 
             Spacer(Modifier.height(8.dp))
 
-if (model.qrPackets.isNotEmpty()) {
+if (model.manualQr.pages.isNotEmpty()) {
                 Text(
-                    text = "QR packets: ${model.qrPackets.size}",
+                    text = "QR packets: ${model.manualQr.pages.size}",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
