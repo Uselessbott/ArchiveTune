@@ -78,6 +78,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -133,7 +134,6 @@ fun MusicTogetherScreen(
     navController: NavController,
     viewModel: MusicTogetherViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current
     val scrollBehavior = appBarScrollBehavior()
     val screenState by viewModel.state.collectAsStateWithLifecycle()
@@ -945,6 +945,7 @@ private fun ManualQrSection(
     model: MusicTogetherUiModel,
     viewModel: MusicTogetherViewModel,
 ) {
+    val context = LocalContext.current
 
     val bringIntoViewRequester =
         remember { BringIntoViewRequester() }
@@ -968,9 +969,9 @@ private fun ManualQrSection(
         }
 
 
-    val qrBitmaps =
+    val qrBitmaps: List<ImageBitmap> =
         remember(model.manualQr.pages) {
-            model.manualQr.pages.map { it.bitmap }
+            model.manualQr.pages.map { page -> page.bitmap }
         }
 
 SectionCard(

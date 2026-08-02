@@ -1042,8 +1042,8 @@ class MusicTogetherViewModel
                         moe.rukamori.archivetune.together.manual.QrImportManager
                             .importPackets(context, uri)
 
-                    if (packets.isNotEmpty()) {
-                        sessionActions.submitManualQrPackets(packets)
+                    packets?.let {
+                        sessionActions.submitManualQrPackets(listOf(it))
                     }
                 }
             }
