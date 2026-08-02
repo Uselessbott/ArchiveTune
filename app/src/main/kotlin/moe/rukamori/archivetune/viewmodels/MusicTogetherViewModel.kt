@@ -330,8 +330,6 @@ class MusicTogetherViewModel
 
             }
         }
-            }
-        }
 
         fun attachService(service: MusicService?) {
             attachMusicTogetherService(service)
@@ -944,30 +942,6 @@ class MusicTogetherViewModel
         }
 
 
-        fun submitQrPackets(
-            packets: List<String>,
-        ) {
-            viewModelScope.launch {
-                repository.submitManualQrPackets(packets)
-            }
-        }
-
-        fun exportPendingIce() {
-            viewModelScope.launch {
-                repository.exportManualIce()
-            }
-        }
-
-        fun clearQrPackets() {
-            _state.update {
-                it.copy(
-                    qrPackets = emptyList(),
-                )
-            }
-        }
-
 
         private companion object {
             const val MaxActivityLogSize = 80
-        }
-    }
