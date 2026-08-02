@@ -304,6 +304,7 @@ ksp {
 
 dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     implementation("com.google.zxing:core:3.5.3")
     implementation("org.webrtc:google-webrtc:1.0.32006")
     implementation(libs.guava)

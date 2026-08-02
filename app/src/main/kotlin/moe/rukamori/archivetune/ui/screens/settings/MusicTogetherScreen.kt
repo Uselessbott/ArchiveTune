@@ -117,6 +117,11 @@ import moe.rukamori.archivetune.viewmodels.MusicTogetherViewModel
 import moe.rukamori.archivetune.ui.component.IconButton as AtIconButton
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.ImageBitmap
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -941,16 +946,6 @@ private fun ManualQrSection(
         remember { BringIntoViewRequester() }
 
     LaunchedEffect(model.qrPackets.size) {
-        if (model.qrPackets.isNotEmpty()) {
-            bringIntoViewRequester.bringIntoView()
-        }
-    }
-
-
-
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-
-    LaunchedEffect(model.qrPackets) {
         if (model.qrPackets.isNotEmpty()) {
             bringIntoViewRequester.bringIntoView()
         }
